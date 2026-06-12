@@ -258,10 +258,22 @@ def collect_global_actual_keys(all_keys):
     return out
 
 
+def is_probable_state_dict_key(key):
+    if "." not in key:
+        return False
+    if key.startswith("layers_") or key.startswith("mtp_layers_"):
+        return False
+    if key.startswith("model.") or key.startswith("lm_head."):
+        return True
+    return any(h in key for h in GLOBAL_HINTS)
+
+
 def grep_key_literals(code_text):
     patterns = [
         r'pop\("([^"]+)"\)',
         r"pop\('([^']+)'\)",
+        r'get\("([^"]+)"\)',
+        r"get\('([^']+)'\)",
         r'\["([^"]+)"\]',
         r"\['([^']+)'\]",
     ]
@@ -277,7 +289,7 @@ def collect_code_expected_second_phase(code_text):
     for k in keys:
         if ".layers." in k:
             continue
-        if any(h in k for h in GLOBAL_HINTS):
+        if is_probable_state_dict_key(k):
             out.append(k)
     return sorted(set(out))
 
@@ -330,6 +342,11 @@ def summarize_leftover(all_keys):
     }
 
 
+def summarize_leftover_after_layer_pass(all_keys):
+    non_layer_keys = [k for k in sorted(all_keys) if ".layers." not in k]
+    return summarize_leftover(non_layer_keys)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--load-dir", required=True)
@@ -379,7 +396,7 @@ def main():
     all_keys = set(state_dict.keys())
 
     global_actual = collect_global_actual_keys(all_keys)
-    leftover_summary = summarize_leftover(all_keys)
+    leftover_summary = summarize_leftover_after_layer_pass(all_keys)
 
     with open(args.convert_script, "r", encoding="utf-8") as f:
         convert_code = f.read()
