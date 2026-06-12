@@ -1153,6 +1153,13 @@ class Mg2HfConvert(Convert):
         down_weights = torch.cat(down_list, dim=1)
         return down_weights
 
+    def _has_weight_in_any_rank(self, mg_weight, candidate_key):
+        for tp_rank, ep_rank in product(self.tp_rank_list, self.ep_rank_list):
+            rank_weight = mg_weight.get((tp_rank, ep_rank))
+            if rank_weight is not None and candidate_key in rank_weight:
+                return True
+        return False
+
     def set_model_layer_mlp(self, hf_weight, mg_weight, hf_layer_idx, local_layer_idx, mtp_layer_flag=False):
         """ dense + moe """
         if self.load_model.qkv_type == "mix":
@@ -1298,7 +1305,19 @@ class Mg2HfConvert(Convert):
                         hf_layer_idx,
                         local_layer_idx,
                     )
-            if self.n_shared_experts and self.n_shared_experts != 0:
+            has_actual_shared_experts = (
+                self._has_weight_in_any_rank(mg_weight, shared_fc1_key)
+                and self._has_weight_in_any_rank(mg_weight, shared_fc2_key)
+            )
+            if has_actual_shared_experts and not (self.n_shared_experts and self.n_shared_experts != 0):
+                logger.warning(
+                    "Shared experts detected from checkpoint keys for layer %s (local_idx=%s), "
+                    "forcing shared_experts HF export although n_shared_experts=%s",
+                    hf_layer_idx,
+                    local_layer_idx,
+                    self.n_shared_experts,
+                )
+            if has_actual_shared_experts:
                 if self.expert_tensor_parallel_size == 1:
                     shared_gate_weights, shared_up_weights = self.linear_fc1_gather_from_etp(mg_weight, shared_fc1_key)
                     shared_down_weights = self.linear_fc2_gather_from_etp(mg_weight, shared_fc2_key)
