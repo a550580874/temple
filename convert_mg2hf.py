@@ -542,13 +542,30 @@ class Mg2HfConvert(Convert):
         hf_weight_key = self.save_model.get_weight()
         mg_weight_key = self.load_model.get_weight()
         emb_list = []
+        embedding_key_candidates = [
+            mg_weight_key["embedding_word_embeddings"],
+            "embedding.word_embeddings.weight",
+            "word_embeddings.weight",
+        ]
         if self.expert_tensor_parallel_size == 1:
             for(tp_rank, ep_rank) in self.attention_tp_ckpts_list:
-                cur_tp_emb = mg_weight[(tp_rank, ep_rank)].get(mg_weight_key["embedding_word_embeddings"])
+                cur_tp_emb = None
+                for candidate in embedding_key_candidates:
+                    cur_tp_emb = mg_weight[(tp_rank, ep_rank)].get(candidate)
+                    if cur_tp_emb is not None:
+                        break
+                if cur_tp_emb is None:
+                    raise KeyError(f"Cannot find embedding weights. Candidates tried: {embedding_key_candidates}")
                 emb_list.append(cur_tp_emb.clone())
         else:
             for tp_rank in self.tp_rank_list:
-                cur_tp_emb = mg_weight[(tp_rank, self.ep_rank_list[0])].get(mg_weight_key["embedding_word_embeddings"])
+                cur_tp_emb = None
+                for candidate in embedding_key_candidates:
+                    cur_tp_emb = mg_weight[(tp_rank, self.ep_rank_list[0])].get(candidate)
+                    if cur_tp_emb is not None:
+                        break
+                if cur_tp_emb is None:
+                    raise KeyError(f"Cannot find embedding weights. Candidates tried: {embedding_key_candidates}")
                 emb_list.append(cur_tp_emb.clone())
         emb_weights = torch.cat(emb_list, dim=0)
         hf_weight[hf_weight_key["embedding_word_embeddings"]] = emb_weights
@@ -558,22 +575,43 @@ class Mg2HfConvert(Convert):
         global GLOBAL_LM_HEAD_WEIGHTS
         hf_weight_key = self.save_model.get_weight()
         mg_weight_key = self.load_model.get_weight()
-        final_norm_key = mg_weight_key["final_layernorm"]
+        final_norm_key_candidates = [
+            mg_weight_key["final_layernorm"],
+            "decoder.final_layernorm.weight",
+            "final_layernorm.weight",
+        ]
         if self.mtp_num_layers:
-            final_norm_key = mg_weight_key["mtp_final_layernorms"]
+            final_norm_key_candidates = [mg_weight_key["mtp_final_layernorms"]]
 
-        final_norm = mg_weight[(self.tp_rank_list[0], self.ep_rank_list[0])].pop(final_norm_key)
+        final_norm = self._pop_first_existing(
+            mg_weight[(self.tp_rank_list[0], self.ep_rank_list[0])],
+            final_norm_key_candidates,
+            desc="final norm",
+        )
         hf_weight[hf_weight_key["final_layernorm"]] = final_norm.clone()
 
         if self.load_model.untie_embeddings_and_output_weights:
             lm_head_list = []
+            output_layer_key_candidates = [
+                mg_weight_key["output_layer"],
+                "output_layer.weight",
+                "lm_head.weight",
+            ]
             if self.expert_tensor_parallel_size == 1:
                 for(tp_rank, ep_rank) in self.attention_tp_ckpts_list:
-                    cur_tp_head = mg_weight[(tp_rank, ep_rank)].pop(mg_weight_key["output_layer"])
+                    cur_tp_head = self._pop_first_existing(
+                        mg_weight[(tp_rank, ep_rank)],
+                        output_layer_key_candidates,
+                        desc=f"output layer for tp={tp_rank}, ep={ep_rank}",
+                    )
                     lm_head_list.append(cur_tp_head.clone())
             else:
                 for tp_rank in self.tp_rank_list:
-                    cur_tp_head = mg_weight[(tp_rank, self.ep_rank_list[0])].pop(mg_weight_key["output_layer"])
+                    cur_tp_head = self._pop_first_existing(
+                        mg_weight[(tp_rank, self.ep_rank_list[0])],
+                        output_layer_key_candidates,
+                        desc=f"output layer for tp={tp_rank}, ep={self.ep_rank_list[0]}",
+                    )
                     lm_head_list.append(cur_tp_head.clone())
             lm_head_weights = torch.cat(lm_head_list, dim=0)
             hf_weight[hf_weight_key["output_layer"]] = lm_head_weights.clone()
@@ -1250,8 +1288,16 @@ class Mg2HfConvert(Convert):
                 router_bias_weights = mg_weight[(self.tp_rank_list[0], self.ep_rank_list[0])].pop(router_bias_key)
                 hf_weight[hf_weight_key["layers_mlp_router_bias"]] = router_bias_weights.clone()
             if getattr(self.load_model, "shared_expert_gate", None):
-                mlp_shared_expert_gate = mg_weight[(self.tp_rank_list[0], self.ep_rank_list[0])].pop(shared_gate_key)
-                hf_weight[hf_weight_key["layers_mlp_shared_expert_gate"]] = mlp_shared_expert_gate.clone()
+                shared_gate_weight = mg_weight[(self.tp_rank_list[0], self.ep_rank_list[0])]
+                if shared_gate_key in shared_gate_weight:
+                    mlp_shared_expert_gate = shared_gate_weight.pop(shared_gate_key)
+                    hf_weight[hf_weight_key["layers_mlp_shared_expert_gate"]] = mlp_shared_expert_gate.clone()
+                else:
+                    logger.warning(
+                        "Shared expert gate weight not found for layer %s (local_idx=%s), skip optional shared gate",
+                        hf_layer_idx,
+                        local_layer_idx,
+                    )
             if self.n_shared_experts and self.n_shared_experts != 0:
                 if self.expert_tensor_parallel_size == 1:
                     shared_gate_weights, shared_up_weights = self.linear_fc1_gather_from_etp(mg_weight, shared_fc1_key)
@@ -1737,7 +1783,6 @@ class Mg2HfConvert(Convert):
                     mg_weights[(tp_rank, ep_rank)] = mg_weight
                 
                 self.debug_schema_check(mg_weights, pp_rank)
-                self.read_pp_rank_weights(pp_rank, mg_weights)
                 self.read_pp_rank_weights(pp_rank, mg_weights)
             else:
                 for vpp_rank in range(self.vpp_size):
