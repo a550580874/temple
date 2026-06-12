@@ -1,44 +1,11 @@
-python3 - <<'PY'
-import torch
 
-ckpt = "/apdcephfs_jn2/share_304376610/lsy/ckpt_hf2mcore_ep8_without_gemm/iter_0000001/mp_rank_00_000/model_optim_rng.pt"
-sd = torch.load(ckpt, map_location="cpu", weights_only=False)["model"]
-keys = list(sd.keys())
-
-grouped = [k for k in keys if "mlp.experts.weight1" in k or "mlp.experts.weight2" in k] 
-legacy = [k for k in keys if "mlp.experts.linear_fc1.weight" in k or "mlp.experts.linear_fc2.weight" in k]
-
-print("ckpt =", ckpt)
-print("grouped_count =", len(grouped))
-print("legacy_count =", len(legacy))
-print("grouped_example =", grouped[:6])
-print("legacy_example =", legacy[:6])
-PY
-ckpt = /apdcephfs_jn2/share_304376610/lsy/ckpt_hf2mcore_ep8_without_gemm/iter_0000001/mp_rank_00_000/model_optim_rng.pt
-grouped_count = 0
-legacy_count = 0
-grouped_example = []
-legacy_example = []
-
-
- python3 - <<'PY'
-import torch
-
-ckpt = "/apdcephfs_jn2/share_304376610/lsy/ckpt_hf2mcore_ep8/iter_0000001/mp_rank_00_000/model_optim_rng.pt"
-sd = torch.load(ckpt, map_location="cpu", weights_only=False)["model"]
-keys = list(sd.keys())
-
-grouped = [k for k in keys if "mlp.experts.weight1" in k or "mlp.experts.weight2" in k] 
-legacy = [k for k in keys if "mlp.experts.linear_fc1.weight" in k or "mlp.experts.linear_fc2.weight" in k]
-
-print("ckpt =", ckpt)
-print("grouped_count =", len(grouped))
-print("legacy_count =", len(legacy))
-print("grouped_example =", grouped[:6])
-print("legacy_example =", legacy[:6])
-PY
-ckpt = /apdcephfs_jn2/share_304376610/lsy/ckpt_hf2mcore_ep8/iter_0000001/mp_rank_00_000/model_optim_rng.pt
-grouped_count = 52
-legacy_count = 0
-grouped_example = ['decoder.layers.1.mlp.experts.weight1', 'decoder.layers.1.mlp.experts.weight2', 'decoder.layers.2.mlp.experts.weight1', 'decoder.layers.2.mlp.experts.weight2', 'decoder.layers.3.mlp.experts.weight1', 'decoder.layers.3.mlp.experts.weight2']
-legacy_example = []
+ > number of parameters on (tensor, pipeline) model parallel rank (0, 0): 3186488832
+ loading checkpoint from /apdcephfs_jn2/share_304376610/lsy/ckpt_hf2mcore_ep8 at iteration 1
+[ERROR] 2026-06-12-19:35:07 (PID:176132, Device:12, RankID:-1) ERR99999 UNKNOWN applicaiton exception
+[ERROR] 2026-06-12-19:35:07 (PID:176112, Device:2, RankID:-1) ERR99999 UNKNOWN applicaiton exception
+[ERROR] 2026-06-12-19:35:08 (PID:176116, Device:4, RankID:-1) ERR99999 UNKNOWN applicaiton exception
+[ERROR] 2026-06-12-19:35:08 (PID:176108, Device:0, RankID:-1) ERR99999 UNKNOWN applicaiton exception
+[ERROR] 2026-06-12-19:35:08 (PID:176124, Device:8, RankID:-1) ERR99999 UNKNOWN applicaiton exception
+[ERROR] 2026-06-12-19:35:08 (PID:176128, Device:10, RankID:-1) ERR99999 UNKNOWN applicaiton exception
+[ERROR] 2026-06-12-19:35:44 (PID:176039, Device:-1, RankID:-1) ERR99999 UNKNOWN applicaiton exception
+/DEBUG                                                                                                  855,2         Bot
