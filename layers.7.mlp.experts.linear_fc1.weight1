@@ -1,11 +1,5 @@
-
+===================================================
+[DEBUG] moe_grouped_gemm=True, spec=['mindspeed_llm.tasks.models.spec.deepseek_spec', 'layer_spec'], transformer_impl=transformer_engine, num_experts=64, first_k_dense_replace=1
+building GPT model ...
  > number of parameters on (tensor, pipeline) model parallel rank (0, 0): 3186488832
  loading checkpoint from /apdcephfs_jn2/share_304376610/lsy/ckpt_hf2mcore_ep8 at iteration 1
-[ERROR] 2026-06-12-19:35:07 (PID:176132, Device:12, RankID:-1) ERR99999 UNKNOWN applicaiton exception
-[ERROR] 2026-06-12-19:35:07 (PID:176112, Device:2, RankID:-1) ERR99999 UNKNOWN applicaiton exception
-[ERROR] 2026-06-12-19:35:08 (PID:176116, Device:4, RankID:-1) ERR99999 UNKNOWN applicaiton exception
-[ERROR] 2026-06-12-19:35:08 (PID:176108, Device:0, RankID:-1) ERR99999 UNKNOWN applicaiton exception
-[ERROR] 2026-06-12-19:35:08 (PID:176124, Device:8, RankID:-1) ERR99999 UNKNOWN applicaiton exception
-[ERROR] 2026-06-12-19:35:08 (PID:176128, Device:10, RankID:-1) ERR99999 UNKNOWN applicaiton exception
-[ERROR] 2026-06-12-19:35:44 (PID:176039, Device:-1, RankID:-1) ERR99999 UNKNOWN applicaiton exception
-/DEBUG                                                                                                  855,2         Bot
