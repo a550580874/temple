@@ -325,7 +325,7 @@ def diff_global(actual_keys, expected_keys):
     }
 
 
-def summarize_leftover(all_keys):
+def summarize_keys(all_keys):
     counter = Counter()
     examples = {}
     for k in sorted(all_keys):
@@ -342,9 +342,23 @@ def summarize_leftover(all_keys):
     }
 
 
-def summarize_leftover_after_layer_pass(all_keys):
-    non_layer_keys = [k for k in sorted(all_keys) if ".layers." not in k]
-    return summarize_leftover(non_layer_keys)
+def build_full_expected_keys(layer_expected_map, global_expected_keys):
+    expected_keys = set(global_expected_keys)
+    for expected in layer_expected_map.values():
+        for row in flatten_expected(expected):
+            expected_keys.add(row["key"])
+    return sorted(expected_keys)
+
+
+def build_full_diff(actual_keys, expected_keys):
+    actual_set = set(actual_keys)
+    expected_set = set(expected_keys)
+    return {
+        "actual_key_count": len(actual_keys),
+        "expected_key_count": len(expected_keys),
+        "missing_expected": sorted(expected_set - actual_set),
+        "unexpected_actual": sorted(actual_set - expected_set),
+    }
 
 
 def main():
@@ -395,8 +409,9 @@ def main():
     state_dict = ckpt["model"]
     all_keys = set(state_dict.keys())
 
+    sorted_all_actual_keys = sorted(all_keys)
+    all_actual_summary = summarize_keys(sorted_all_actual_keys)
     global_actual = collect_global_actual_keys(all_keys)
-    leftover_summary = summarize_leftover_after_layer_pass(all_keys)
 
     with open(args.convert_script, "r", encoding="utf-8") as f:
         convert_code = f.read()
@@ -418,8 +433,12 @@ def main():
         "ep_rank": args.ep_rank,
     }
 
+    layer_expected_map = {}
+
     expected_full = {
         "meta": meta,
+        "all_expected_keys": [],
+        "all_expected_key_summary": {},
         "global": {
             "expected": global_expected,
         },
@@ -431,26 +450,28 @@ def main():
         "meta": {
             "ckpt_path": ckpt_path,
         },
+        "all_actual_keys": sorted_all_actual_keys,
+        "all_actual_key_summary": all_actual_summary,
         "global": {
             "actual": global_actual,
         },
         "layers": {},
-        "leftover_after_layer_pass": leftover_summary,
     }
 
     diff_full = {
         "meta": {
             "ckpt_path": ckpt_path,
         },
+        "full_compare": {},
         "global": global_diff,
         "layers": {},
         "code_expected_second_phase": code_expected_second_phase,
-        "leftover_after_layer_pass": leftover_summary,
     }
 
     for local_idx in range(load_model.num_layers):
         actual_keys = collect_actual_layer_keys(state_dict, local_idx)
         expected = expected_keys_for_layer(load_model, local_idx, local_idx)
+        layer_expected_map[str(local_idx)] = expected
         detected = detect_schema(actual_keys.keys(), local_idx)
         diff = build_diff(expected, actual_keys.keys(), local_idx)
 
@@ -467,6 +488,11 @@ def main():
             "unexpected_actual": diff["unexpected_actual"],
             "suggestions": diff["suggestions"],
         }
+
+    all_expected_keys = build_full_expected_keys(layer_expected_map, global_expected)
+    expected_full["all_expected_keys"] = all_expected_keys
+    expected_full["all_expected_key_summary"] = summarize_keys(all_expected_keys)
+    diff_full["full_compare"] = build_full_diff(sorted_all_actual_keys, all_expected_keys)
 
     expected_path = f"{args.output_prefix}_expected.json"
     actual_path = f"{args.output_prefix}_actual.json"
