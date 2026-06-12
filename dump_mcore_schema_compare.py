@@ -81,6 +81,11 @@ def maybe_add(expected, group, name, key):
         expected[group][name] = key
 
 
+def maybe_add_hf(expected, group, name, key):
+    if key:
+        expected[group][name] = key
+
+
 def expected_keys_for_layer(load_model, local_idx, hf_layer_idx):
     mg_weight_key = load_model.get_weight(local_idx)
     expected = defaultdict(dict)
@@ -128,6 +133,254 @@ def expected_keys_for_layer(load_model, local_idx, hf_layer_idx):
     maybe_add(expected, "mlp_moe", "experts_weight2", mg_weight_key.get("layers_mlp_experts_weight2"))
 
     return expected
+
+
+def expected_hf_keys_for_layer(load_model, save_model, hf_layer_idx):
+    hf_weight_key = save_model.get_weight(layer_idx=hf_layer_idx)
+    expected = defaultdict(dict)
+
+    maybe_add_hf(expected, "norm", "input_layernorm", hf_weight_key.get("layers_input_layernorm"))
+    maybe_add_hf(
+        expected,
+        "norm",
+        "pre_mlp_layernorm",
+        hf_weight_key.get("layers_self_attention_pre_mlp_layernorm"),
+    )
+
+    qkv_type = getattr(load_model, "qkv_type", None)
+    expected["meta"]["qkv_type"] = qkv_type
+
+    if qkv_type == "pack_mla":
+        maybe_add_hf(expected, "attn", "linear_q_proj", hf_weight_key.get("layers_self_attention_linear_q_proj"))
+        maybe_add_hf(expected, "attn", "linear_kv_proj", hf_weight_key.get("layers_self_attention_linear_kv_proj"))
+        maybe_add_hf(expected, "attn", "linear_proj", hf_weight_key.get("layers_self_attention_linear_proj"))
+        maybe_add_hf(expected, "attn", "linear_kv_up_proj", hf_weight_key.get("layers_self_attention_linear_kv_up_proj"))
+        maybe_add_hf(expected, "attn", "kv_layernorm", hf_weight_key.get("layers_self_attention_kv_layernorm"))
+        maybe_add_hf(expected, "attn", "q_layernorm", hf_weight_key.get("layers_self_attention_q_layernorm"))
+        maybe_add_hf(expected, "attn", "linear_q_up_proj", hf_weight_key.get("layers_self_attention_linear_q_up_proj"))
+    elif qkv_type in ("unpack", "pack_gqa", "mix"):
+        maybe_add_hf(expected, "attn", "linear_q_proj", hf_weight_key.get("layers_self_attention_linear_q_proj"))
+        maybe_add_hf(expected, "attn", "linear_k_proj", hf_weight_key.get("layers_self_attention_linear_k_proj"))
+        maybe_add_hf(expected, "attn", "linear_v_proj", hf_weight_key.get("layers_self_attention_linear_v_proj"))
+        maybe_add_hf(expected, "attn", "linear_proj", hf_weight_key.get("layers_self_attention_linear_proj"))
+
+    if hf_layer_idx < (getattr(load_model, "first_k_dense_replace", 0) or 0):
+        maybe_add_hf(expected, "mlp_dense", "linear_fc1", hf_weight_key.get("layers_mlp_linear_fc1"))
+        maybe_add_hf(expected, "mlp_dense", "gate_proj", hf_weight_key.get("layers_mlp_gate_proj"))
+        maybe_add_hf(expected, "mlp_dense", "up_proj", hf_weight_key.get("layers_mlp_up_proj"))
+        maybe_add_hf(expected, "mlp_dense", "linear_fc2", hf_weight_key.get("layers_mlp_linear_fc2"))
+    elif getattr(load_model, "num_experts", None):
+        maybe_add_hf(expected, "mlp_moe", "router", hf_weight_key.get("layers_mlp_router"))
+        maybe_add_hf(expected, "mlp_moe", "router_bias", hf_weight_key.get("layers_mlp_router_bias"))
+        maybe_add_hf(expected, "mlp_moe", "shared_expert_gate", hf_weight_key.get("layers_mlp_shared_expert_gate"))
+        maybe_add_hf(
+            expected,
+            "mlp_moe",
+            "shared_gate_proj",
+            hf_weight_key.get("layers_mlp_shared_experts_gate_proj"),
+        )
+        maybe_add_hf(
+            expected,
+            "mlp_moe",
+            "shared_up_proj",
+            hf_weight_key.get("layers_mlp_shared_experts_up_proj"),
+        )
+        maybe_add_hf(
+            expected,
+            "mlp_moe",
+            "shared_fc2",
+            hf_weight_key.get("layers_mlp_shared_experts_linear_fc2"),
+        )
+        for expert_idx in range(getattr(load_model, "num_experts", 0) or 0):
+            expert_weight_key = save_model.get_weight(layer_idx=hf_layer_idx, expert_idx=expert_idx)
+            maybe_add_hf(
+                expected,
+                "mlp_moe_experts",
+                f"expert_{expert_idx}_gate_proj",
+                expert_weight_key.get("layers_mlp_experts_gate_proj"),
+            )
+            maybe_add_hf(
+                expected,
+                "mlp_moe_experts",
+                f"expert_{expert_idx}_up_proj",
+                expert_weight_key.get("layers_mlp_experts_up_proj"),
+            )
+            maybe_add_hf(
+                expected,
+                "mlp_moe_experts",
+                f"expert_{expert_idx}_fc2",
+                expert_weight_key.get("layers_mlp_experts_linear_fc2"),
+            )
+
+    return expected
+
+
+def expected_hf_global_keys(load_model, save_model):
+    hf_weight_key = save_model.get_weight()
+    expected = defaultdict(dict)
+    maybe_add_hf(expected, "global", "embedding", hf_weight_key.get("embedding_word_embeddings"))
+    maybe_add_hf(expected, "global", "final_layernorm", hf_weight_key.get("final_layernorm"))
+    if getattr(load_model, "untie_embeddings_and_output_weights", False):
+        maybe_add_hf(expected, "global", "output_layer", hf_weight_key.get("output_layer"))
+    return expected
+
+
+def emittable_hf_keys_for_layer(load_model, save_model, actual_key_names, local_idx, hf_layer_idx):
+    actual_set = set(actual_key_names)
+    layer_prefix = f"decoder.layers.{local_idx}."
+    hf_weight_key = save_model.get_weight(layer_idx=hf_layer_idx)
+    emitted = defaultdict(dict)
+
+    def has(name):
+        return f"{layer_prefix}{name}" in actual_set
+
+    if has("input_layernorm.weight"):
+        maybe_add_hf(emitted, "norm", "input_layernorm", hf_weight_key.get("layers_input_layernorm"))
+
+    if (
+        has("pre_mlp_layernorm.weight")
+        or has("mlp.linear_fc1.layer_norm_weight")
+        or has("post_attn_norm.weight")
+    ):
+        maybe_add_hf(
+            emitted,
+            "norm",
+            "pre_mlp_layernorm",
+            hf_weight_key.get("layers_self_attention_pre_mlp_layernorm"),
+        )
+
+    if (
+        has("self_attention.linear_q_proj.weight")
+        and has("self_attention.linear_kv_down_proj.weight")
+        and has("self_attention.linear_kv_up_proj.weight")
+    ):
+        maybe_add_hf(emitted, "attn", "linear_q_proj", hf_weight_key.get("layers_self_attention_linear_q_proj"))
+        maybe_add_hf(emitted, "attn", "linear_kv_proj", hf_weight_key.get("layers_self_attention_linear_kv_proj"))
+        maybe_add_hf(emitted, "attn", "linear_proj", hf_weight_key.get("layers_self_attention_linear_proj"))
+        maybe_add_hf(emitted, "attn", "linear_kv_up_proj", hf_weight_key.get("layers_self_attention_linear_kv_up_proj"))
+        if has("self_attention.linear_kv_up_proj.layer_norm_weight"):
+            maybe_add_hf(emitted, "attn", "kv_layernorm", hf_weight_key.get("layers_self_attention_kv_layernorm"))
+    elif has("self_attention.linear_qkv.weight"):
+        maybe_add_hf(emitted, "attn", "linear_q_proj", hf_weight_key.get("layers_self_attention_linear_q_proj"))
+        maybe_add_hf(emitted, "attn", "linear_kv_proj", hf_weight_key.get("layers_self_attention_linear_kv_proj"))
+        maybe_add_hf(emitted, "attn", "linear_proj", hf_weight_key.get("layers_self_attention_linear_proj"))
+        maybe_add_hf(emitted, "attn", "linear_kv_up_proj", hf_weight_key.get("layers_self_attention_linear_kv_up_proj"))
+        maybe_add_hf(emitted, "attn", "kv_layernorm", hf_weight_key.get("layers_self_attention_kv_layernorm"))
+        maybe_add_hf(emitted, "attn", "q_layernorm", hf_weight_key.get("layers_self_attention_q_layernorm"))
+        maybe_add_hf(emitted, "attn", "linear_q_up_proj", hf_weight_key.get("layers_self_attention_linear_q_up_proj"))
+
+    force_dense_layer = has("mlp.linear_fc1.weight") and has("mlp.linear_fc2.weight")
+
+    if force_dense_layer and hf_layer_idx < (getattr(load_model, "first_k_dense_replace", 0) or 0):
+        maybe_add_hf(emitted, "mlp_dense", "linear_fc1", hf_weight_key.get("layers_mlp_linear_fc1"))
+        maybe_add_hf(emitted, "mlp_dense", "gate_proj", hf_weight_key.get("layers_mlp_gate_proj"))
+        maybe_add_hf(emitted, "mlp_dense", "up_proj", hf_weight_key.get("layers_mlp_up_proj"))
+        maybe_add_hf(emitted, "mlp_dense", "linear_fc2", hf_weight_key.get("layers_mlp_linear_fc2"))
+    elif hf_layer_idx >= (getattr(load_model, "first_k_dense_replace", 0) or 0):
+        if has("mlp.router.weight"):
+            maybe_add_hf(emitted, "mlp_moe", "router", hf_weight_key.get("layers_mlp_router"))
+        if has("mlp.router.expert_bias"):
+            maybe_add_hf(emitted, "mlp_moe", "router_bias", hf_weight_key.get("layers_mlp_router_bias"))
+        if has("mlp.shared_experts.gate_weight") and getattr(load_model, "shared_expert_gate", None):
+            maybe_add_hf(emitted, "mlp_moe", "shared_expert_gate", hf_weight_key.get("layers_mlp_shared_expert_gate"))
+        if (
+            has("mlp.shared_experts.linear_fc1.weight")
+            and has("mlp.shared_experts.linear_fc2.weight")
+            and getattr(load_model, "n_shared_experts", None)
+        ):
+            maybe_add_hf(
+                emitted,
+                "mlp_moe",
+                "shared_gate_proj",
+                hf_weight_key.get("layers_mlp_shared_experts_gate_proj"),
+            )
+            maybe_add_hf(
+                emitted,
+                "mlp_moe",
+                "shared_up_proj",
+                hf_weight_key.get("layers_mlp_shared_experts_up_proj"),
+            )
+            maybe_add_hf(
+                emitted,
+                "mlp_moe",
+                "shared_fc2",
+                hf_weight_key.get("layers_mlp_shared_experts_linear_fc2"),
+            )
+
+        has_grouped = has("mlp.experts.weight1") and has("mlp.experts.weight2")
+        has_legacy = any(has(f"mlp.experts.linear_fc1.weight{i}") for i in range(128))
+        if has_grouped or has_legacy:
+            for expert_idx in range(getattr(load_model, "num_experts", 0) or 0):
+                expert_weight_key = save_model.get_weight(layer_idx=hf_layer_idx, expert_idx=expert_idx)
+                maybe_add_hf(
+                    emitted,
+                    "mlp_moe_experts",
+                    f"expert_{expert_idx}_gate_proj",
+                    expert_weight_key.get("layers_mlp_experts_gate_proj"),
+                )
+                maybe_add_hf(
+                    emitted,
+                    "mlp_moe_experts",
+                    f"expert_{expert_idx}_up_proj",
+                    expert_weight_key.get("layers_mlp_experts_up_proj"),
+                )
+                maybe_add_hf(
+                    emitted,
+                    "mlp_moe_experts",
+                    f"expert_{expert_idx}_fc2",
+                    expert_weight_key.get("layers_mlp_experts_linear_fc2"),
+                )
+
+    return emitted
+
+
+def emittable_hf_global_keys(load_model, save_model, all_keys):
+    actual_set = set(all_keys)
+    hf_weight_key = save_model.get_weight()
+    emitted = defaultdict(dict)
+    if (
+        "embedding.word_embeddings.weight" in actual_set
+        or "word_embeddings.weight" in actual_set
+        or "embedding_word_embeddings" in actual_set
+    ):
+        maybe_add_hf(emitted, "global", "embedding", hf_weight_key.get("embedding_word_embeddings"))
+    if (
+        "decoder.final_layernorm.weight" in actual_set
+        or "final_layernorm.weight" in actual_set
+    ):
+        maybe_add_hf(emitted, "global", "final_layernorm", hf_weight_key.get("final_layernorm"))
+    if getattr(load_model, "untie_embeddings_and_output_weights", False) and (
+        "output_layer.weight" in actual_set or "lm_head.weight" in actual_set
+    ):
+        maybe_add_hf(emitted, "global", "output_layer", hf_weight_key.get("output_layer"))
+    return emitted
+
+
+def build_hf_bridge_blockers(load_model, actual_key_names, local_idx, hf_layer_idx):
+    actual_set = set(actual_key_names)
+    layer_prefix = f"decoder.layers.{local_idx}."
+    blockers = []
+
+    shared_fc1 = f"{layer_prefix}mlp.shared_experts.linear_fc1.weight"
+    shared_fc2 = f"{layer_prefix}mlp.shared_experts.linear_fc2.weight"
+    if shared_fc1 in actual_set and shared_fc2 in actual_set and not getattr(load_model, "n_shared_experts", None):
+        blockers.append({
+            "type": "shared_experts_skipped_by_condition",
+            "layer": hf_layer_idx,
+            "reason": "actual shared_experts weights exist, but load_model.n_shared_experts is falsy so mg2hf will skip shared_experts HF outputs",
+            "actual_keys": [shared_fc1, shared_fc2],
+        })
+
+    shared_gate = f"{layer_prefix}mlp.shared_experts.gate_weight"
+    if shared_gate not in actual_set and getattr(load_model, "shared_expert_gate", None):
+        blockers.append({
+            "type": "optional_shared_gate_missing",
+            "layer": hf_layer_idx,
+            "reason": "converter config enables shared_expert_gate but actual ckpt has no shared_experts.gate_weight",
+            "actual_keys": [],
+        })
+
+    return blockers
 
 
 def flatten_expected(expected):
@@ -393,7 +646,7 @@ def main():
     args.save_dir = "/tmp/unused_hf_out"
 
     load_model = MegatronModel(args)
-    _ = HuggingFaceModel(args)
+    save_model = HuggingFaceModel(args)
 
     iter_path = get_iter_path(args.load_dir, args.iteration)
     ckpt_path = get_pt_path(
@@ -419,6 +672,8 @@ def main():
     code_expected_second_phase = collect_code_expected_second_phase(convert_code)
     global_expected = code_expected_second_phase
     global_diff = diff_global(global_actual, global_expected)
+    hf_global_expected = expected_hf_global_keys(load_model, save_model)
+    hf_global_emittable = emittable_hf_global_keys(load_model, save_model, all_keys)
 
     meta = {
         "ckpt_path": ckpt_path,
@@ -434,15 +689,24 @@ def main():
     }
 
     layer_expected_map = {}
+    hf_layer_expected_map = {}
+    hf_layer_emittable_map = {}
+    hf_bridge_blockers = []
 
     expected_full = {
         "meta": meta,
         "all_expected_keys": [],
         "all_expected_key_summary": {},
+        "hf2mg_required_hf_keys": [],
+        "hf2mg_required_hf_key_summary": {},
         "global": {
             "expected": global_expected,
         },
+        "hf_global": {
+            "expected": hf_global_expected,
+        },
         "layers": {},
+        "hf_layers": {},
         "code_expected_second_phase": code_expected_second_phase,
     }
 
@@ -452,10 +716,16 @@ def main():
         },
         "all_actual_keys": sorted_all_actual_keys,
         "all_actual_key_summary": all_actual_summary,
+        "mg2hf_emittable_hf_keys": [],
+        "mg2hf_emittable_hf_key_summary": {},
         "global": {
             "actual": global_actual,
         },
+        "hf_global": {
+            "emittable": hf_global_emittable,
+        },
         "layers": {},
+        "hf_layers": {},
     }
 
     diff_full = {
@@ -463,8 +733,10 @@ def main():
             "ckpt_path": ckpt_path,
         },
         "full_compare": {},
+        "hf_bridge_compare": {},
         "global": global_diff,
         "layers": {},
+        "hf_layers": {},
         "code_expected_second_phase": code_expected_second_phase,
     }
 
@@ -472,15 +744,32 @@ def main():
         actual_keys = collect_actual_layer_keys(state_dict, local_idx)
         expected = expected_keys_for_layer(load_model, local_idx, local_idx)
         layer_expected_map[str(local_idx)] = expected
+        hf_expected = expected_hf_keys_for_layer(load_model, save_model, local_idx)
+        hf_emittable = emittable_hf_keys_for_layer(load_model, save_model, actual_keys.keys(), local_idx, local_idx)
+        hf_layer_expected_map[str(local_idx)] = hf_expected
+        hf_layer_emittable_map[str(local_idx)] = hf_emittable
         detected = detect_schema(actual_keys.keys(), local_idx)
         diff = build_diff(expected, actual_keys.keys(), local_idx)
+        hf_layer_diff = build_full_diff(
+            sorted(row["key"] for row in flatten_expected(hf_emittable)),
+            sorted(row["key"] for row in flatten_expected(hf_expected)),
+        )
+        hf_blockers = build_hf_bridge_blockers(load_model, actual_keys.keys(), local_idx, local_idx)
+        hf_bridge_blockers.extend(hf_blockers)
 
         expected_full["layers"][str(local_idx)] = {
             "expected": expected,
         }
+        expected_full["hf_layers"][str(local_idx)] = {
+            "expected": hf_expected,
+        }
         actual_full["layers"][str(local_idx)] = {
             "detected_schema": detected,
             "actual": actual_keys,
+        }
+        actual_full["hf_layers"][str(local_idx)] = {
+            "detected_schema": detected,
+            "emittable": hf_emittable,
         }
         diff_full["layers"][str(local_idx)] = {
             "detected_schema": detected,
@@ -488,11 +777,31 @@ def main():
             "unexpected_actual": diff["unexpected_actual"],
             "suggestions": diff["suggestions"],
         }
+        diff_full["hf_layers"][str(local_idx)] = {
+            "detected_schema": detected,
+            "missing_required_hf": hf_layer_diff["missing_expected"],
+            "emittable_but_not_required_hf": hf_layer_diff["unexpected_actual"],
+            "blockers": hf_blockers,
+        }
 
     all_expected_keys = build_full_expected_keys(layer_expected_map, global_expected)
     expected_full["all_expected_keys"] = all_expected_keys
     expected_full["all_expected_key_summary"] = summarize_keys(all_expected_keys)
     diff_full["full_compare"] = build_full_diff(sorted_all_actual_keys, all_expected_keys)
+
+    hf_required_hf_keys = build_full_expected_keys(hf_layer_expected_map, [row["key"] for row in flatten_expected(hf_global_expected)])
+    hf_emittable_hf_keys = build_full_expected_keys(hf_layer_emittable_map, [row["key"] for row in flatten_expected(hf_global_emittable)])
+    expected_full["hf2mg_required_hf_keys"] = hf_required_hf_keys
+    expected_full["hf2mg_required_hf_key_summary"] = summarize_keys(hf_required_hf_keys)
+    actual_full["mg2hf_emittable_hf_keys"] = hf_emittable_hf_keys
+    actual_full["mg2hf_emittable_hf_key_summary"] = summarize_keys(hf_emittable_hf_keys)
+    diff_full["hf_bridge_compare"] = {
+        "required_hf_key_count": len(hf_required_hf_keys),
+        "emittable_hf_key_count": len(hf_emittable_hf_keys),
+        "missing_required_hf": sorted(set(hf_required_hf_keys) - set(hf_emittable_hf_keys)),
+        "emittable_but_not_required_hf": sorted(set(hf_emittable_hf_keys) - set(hf_required_hf_keys)),
+        "blockers": hf_bridge_blockers,
+    }
 
     expected_path = f"{args.output_prefix}_expected.json"
     actual_path = f"{args.output_prefix}_actual.json"
