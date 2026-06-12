@@ -383,6 +383,102 @@ def build_hf_bridge_blockers(load_model, actual_key_names, local_idx, hf_layer_i
     return blockers
 
 
+def detect_runtime_moe_schema(all_keys, load_model):
+    first_k_dense_replace = getattr(load_model, "first_k_dense_replace", 0) or 0
+    grouped_layers = []
+    legacy_layers = []
+    mixed_layers = []
+
+    for local_idx in range(first_k_dense_replace, getattr(load_model, "num_layers", 0) or 0):
+        prefix = f"decoder.layers.{local_idx}."
+        layer_keys = [k for k in all_keys if k.startswith(prefix)]
+        has_grouped = any(
+            k == f"{prefix}mlp.experts.weight1" or k == f"{prefix}mlp.experts.weight2"
+            for k in layer_keys
+        )
+        has_legacy = any(
+            k.startswith(f"{prefix}mlp.experts.linear_fc1.weight") or k.startswith(f"{prefix}mlp.experts.linear_fc2.weight")
+            for k in layer_keys
+        )
+        if has_grouped and has_legacy:
+            mixed_layers.append(local_idx)
+        elif has_grouped:
+            grouped_layers.append(local_idx)
+        elif has_legacy:
+            legacy_layers.append(local_idx)
+
+    recommendation = "unknown"
+    if grouped_layers and not legacy_layers and not mixed_layers:
+        recommendation = "generate_should_enable_moe_grouped_gemm"
+    elif legacy_layers and not grouped_layers and not mixed_layers:
+        recommendation = "generate_should_disable_moe_grouped_gemm"
+    elif mixed_layers:
+        recommendation = "checkpoint_has_mixed_moe_schema"
+
+    return {
+        "first_k_dense_replace": first_k_dense_replace,
+        "grouped_layers": grouped_layers,
+        "legacy_layers": legacy_layers,
+        "mixed_layers": mixed_layers,
+        "recommendation": recommendation,
+    }
+
+
+def get_local_expert_count(load_model):
+    num_experts = getattr(load_model, "num_experts", 0) or 0
+    ep_size = getattr(load_model, "expert_model_parallel_size", 1) or 1
+    if num_experts and ep_size and num_experts % ep_size == 0:
+        return num_experts // ep_size
+    return num_experts
+
+
+def expected_generate_moe_keys_for_layer(load_model, local_idx, runtime_grouped_gemm):
+    prefix = f"decoder.layers.{local_idx}."
+    keys = []
+
+    first_k_dense_replace = getattr(load_model, "first_k_dense_replace", 0) or 0
+    if local_idx < first_k_dense_replace:
+        return keys
+
+    num_experts = getattr(load_model, "num_experts", 0) or 0
+    if not num_experts:
+        return keys
+
+    keys.append(f"{prefix}mlp.router.weight")
+    keys.append(f"{prefix}mlp.router.expert_bias")
+
+    n_shared_experts = getattr(load_model, "n_shared_experts", 0) or 0
+    if n_shared_experts:
+        keys.append(f"{prefix}mlp.shared_experts.linear_fc1.weight")
+        keys.append(f"{prefix}mlp.shared_experts.linear_fc2.weight")
+        if getattr(load_model, "shared_expert_gate", None):
+            keys.append(f"{prefix}mlp.shared_experts.gate_weight")
+
+    if runtime_grouped_gemm:
+        keys.append(f"{prefix}mlp.experts.weight1")
+        keys.append(f"{prefix}mlp.experts.weight2")
+    else:
+        for expert_idx in range(get_local_expert_count(load_model)):
+            keys.append(f"{prefix}mlp.experts.linear_fc1.weight{expert_idx}")
+            keys.append(f"{prefix}mlp.experts.linear_fc2.weight{expert_idx}")
+
+    return keys
+
+
+def build_generate_moe_compare(actual_keys, expected_keys):
+    actual_set = set(actual_keys)
+    expected_set = set(expected_keys)
+    schema_actual = sorted(k for k in actual_set if ".mlp.experts." in k or ".mlp.router." in k or ".mlp.shared_experts." in k)
+    unexpected_schema_actual = sorted(k for k in schema_actual if k not in expected_set)
+    return {
+        "required_keys": expected_keys,
+        "required_key_count": len(expected_keys),
+        "missing_required_keys": sorted(expected_set - actual_set),
+        "unexpected_schema_keys": unexpected_schema_actual,
+        "matches": not (expected_set - actual_set),
+    }
+
+
 def flatten_expected(expected):
     rows = []
     for group, items in expected.items():
@@ -674,6 +770,7 @@ def main():
     global_diff = diff_global(global_actual, global_expected)
     hf_global_expected = expected_hf_global_keys(load_model, save_model)
     hf_global_emittable = emittable_hf_global_keys(load_model, save_model, all_keys)
+    runtime_moe_schema = detect_runtime_moe_schema(sorted_all_actual_keys, load_model)
 
     meta = {
         "ckpt_path": ckpt_path,
@@ -686,6 +783,7 @@ def main():
         "tp_rank": args.tp_rank,
         "pp_rank": args.pp_rank,
         "ep_rank": args.ep_rank,
+        "runtime_moe_schema": runtime_moe_schema,
     }
 
     layer_expected_map = {}
@@ -699,6 +797,7 @@ def main():
         "all_expected_key_summary": {},
         "hf2mg_required_hf_keys": [],
         "hf2mg_required_hf_key_summary": {},
+        "generate_runtime_contract": runtime_moe_schema,
         "global": {
             "expected": global_expected,
         },
@@ -707,6 +806,7 @@ def main():
         },
         "layers": {},
         "hf_layers": {},
+        "generate_layers": {},
         "code_expected_second_phase": code_expected_second_phase,
     }
 
@@ -718,6 +818,7 @@ def main():
         "all_actual_key_summary": all_actual_summary,
         "mg2hf_emittable_hf_keys": [],
         "mg2hf_emittable_hf_key_summary": {},
+        "generate_runtime_contract": runtime_moe_schema,
         "global": {
             "actual": global_actual,
         },
@@ -726,6 +827,7 @@ def main():
         },
         "layers": {},
         "hf_layers": {},
+        "generate_layers": {},
     }
 
     diff_full = {
@@ -734,11 +836,16 @@ def main():
         },
         "full_compare": {},
         "hf_bridge_compare": {},
+        "generate_runtime_contract": runtime_moe_schema,
         "global": global_diff,
         "layers": {},
         "hf_layers": {},
+        "generate_layers": {},
         "code_expected_second_phase": code_expected_second_phase,
     }
+
+    grouped_generate_missing = 0
+    legacy_generate_missing = 0
 
     for local_idx in range(load_model.num_layers):
         actual_keys = collect_actual_layer_keys(state_dict, local_idx)
@@ -756,12 +863,22 @@ def main():
         )
         hf_blockers = build_hf_bridge_blockers(load_model, actual_keys.keys(), local_idx, local_idx)
         hf_bridge_blockers.extend(hf_blockers)
+        grouped_generate_expected = expected_generate_moe_keys_for_layer(load_model, local_idx, runtime_grouped_gemm=True)
+        legacy_generate_expected = expected_generate_moe_keys_for_layer(load_model, local_idx, runtime_grouped_gemm=False)
+        grouped_generate_compare = build_generate_moe_compare(actual_keys.keys(), grouped_generate_expected)
+        legacy_generate_compare = build_generate_moe_compare(actual_keys.keys(), legacy_generate_expected)
+        grouped_generate_missing += len(grouped_generate_compare["missing_required_keys"])
+        legacy_generate_missing += len(legacy_generate_compare["missing_required_keys"])
 
         expected_full["layers"][str(local_idx)] = {
             "expected": expected,
         }
         expected_full["hf_layers"][str(local_idx)] = {
             "expected": hf_expected,
+        }
+        expected_full["generate_layers"][str(local_idx)] = {
+            "grouped_runtime_required": grouped_generate_expected,
+            "legacy_runtime_required": legacy_generate_expected,
         }
         actual_full["layers"][str(local_idx)] = {
             "detected_schema": detected,
@@ -770,6 +887,11 @@ def main():
         actual_full["hf_layers"][str(local_idx)] = {
             "detected_schema": detected,
             "emittable": hf_emittable,
+        }
+        actual_full["generate_layers"][str(local_idx)] = {
+            "detected_schema": detected,
+            "grouped_runtime_compare": grouped_generate_compare,
+            "legacy_runtime_compare": legacy_generate_compare,
         }
         diff_full["layers"][str(local_idx)] = {
             "detected_schema": detected,
@@ -782,6 +904,11 @@ def main():
             "missing_required_hf": hf_layer_diff["missing_expected"],
             "emittable_but_not_required_hf": hf_layer_diff["unexpected_actual"],
             "blockers": hf_blockers,
+        }
+        diff_full["generate_layers"][str(local_idx)] = {
+            "detected_schema": detected,
+            "grouped_runtime_compare": grouped_generate_compare,
+            "legacy_runtime_compare": legacy_generate_compare,
         }
 
     all_expected_keys = build_full_expected_keys(layer_expected_map, global_expected)
@@ -801,6 +928,11 @@ def main():
         "missing_required_hf": sorted(set(hf_required_hf_keys) - set(hf_emittable_hf_keys)),
         "emittable_but_not_required_hf": sorted(set(hf_emittable_hf_keys) - set(hf_required_hf_keys)),
         "blockers": hf_bridge_blockers,
+    }
+    diff_full["generate_load_compare"] = {
+        "grouped_runtime_missing_total": grouped_generate_missing,
+        "legacy_runtime_missing_total": legacy_generate_missing,
+        "recommended_runtime": runtime_moe_schema["recommendation"],
     }
 
     expected_path = f"{args.output_prefix}_expected.json"
