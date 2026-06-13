@@ -1,15 +1,76 @@
-[rank12]:     model = MegatronModuleForCausalLM.from_pretrained(
-[rank12]:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank12]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 241, in from_pretrained
-[rank12]:     load_checkpoint(args.model, None, None, 'load')
-[rank12]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/checkpointing.py", line 129, in wrapper
-[rank12]:     return fn(ddp_model, optimizer, opt_param_scheduler, strict=strict, *args, **kwargs)
-[rank12]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank12]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/training/checkpointing.py", line 1378, in load_checkpoint
-[rank12]:     ddp_model[0].load_state_dict(state_dict['model'], strict=strict)
-[rank12]:   File "/usr/local/python3.12/lib/python3.12/site-packages/torch/nn/modules/module.py", line 2593, in load_state_dict
-[rank12]:     raise RuntimeError(
-[rank12]: RuntimeError: Error(s) in loading state_dict for GPTModelInfer:
-[rank12]:       Missing key(s) in state_dict: "decoder.layers.0.self_attention.linear_qkv.weight", "decoder.layers.0.self_attention.kv_layernorm.weight", "decoder.layers.1.self_attention.linear_qkv.weight", "decoder.layers.1.self_attention.kv_layernorm.weight", "decoder.layers.2.self_attention.linear_qkv.weight", "decoder.layers.2.self_attention.kv_layernorm.weight", "decoder.layers.3.self_attention.linear_qkv.weight", "decoder.layers.3.self_attention.kv_layernorm.weight", "decoder.layers.4.self_attention.linear_qkv.weight", "decoder.layers.4.self_attention.kv_layernorm.weight", "decoder.layers.5.self_attention.linear_qkv.weight", "decoder.layers.5.self_attention.kv_layernorm.weight", "decoder.layers.6.self_attention.linear_qkv.weight", "decoder.layers.6.self_attention.kv_layernorm.weight", "decoder.layers.7.self_attention.linear_qkv.weight", "decoder.layers.7.self_attention.kv_layernorm.weight", "decoder.layers.8.self_attention.linear_qkv.weight", "decoder.layers.8.self_attention.kv_layernorm.weight", "decoder.layers.9.self_attention.linear_qkv.weight", "decoder.layers.9.self_attention.kv_layernorm.weight", "decoder.layers.10.self_attention.linear_qkv.weight", "decoder.layers.10.self_attention.kv_layernorm.weight", "decoder.layers.11.self_attention.linear_qkv.weight", "decoder.layers.11.self_attention.kv_layernorm.weight", "decoder.layers.12.self_attention.linear_qkv.weight", "decoder.layers.12.self_attention.kv_layernorm.weight", "decoder.layers.13.self_attention.linear_qkv.weight", "decoder.layers.13.self_attention.kv_layernorm.weight", "decoder.layers.14.self_attention.linear_qkv.weight", "decoder.layers.14.self_attention.kv_layernorm.weight", "decoder.layers.15.self_attention.linear_qkv.weight", "decoder.layers.15.self_attention.kv_layernorm.weight", "decoder.layers.16.self_attention.linear_qkv.weight", "decoder.layers.16.self_attention.kv_layernorm.weight", "decoder.layers.17.self_attention.linear_qkv.weight", "decoder.layers.17.self_attention.kv_layernorm.weight", "decoder.layers.18.self_attention.linear_qkv.weight", "decoder.layers.18.self_attention.kv_layernorm.weight", "decoder.layers.19.self_attention.linear_qkv.weight", "decoder.layers.19.self_attention.kv_layernorm.weight", "decoder.layers.20.self_attention.linear_qkv.weight", "decoder.layers.20.self_attention.kv_layernorm.weight", "decoder.layers.21.self_attention.linear_qkv.weight", "decoder.layers.21.self_attention.kv_layernorm.weight", "decoder.layers.22.self_attention.linear_qkv.weight", "decoder.layers.22.self_attention.kv_layernorm.weight", "decoder.layers.23.self_attention.linear_qkv.weight", "decoder.layers.23.self_attention.kv_layernorm.weight", "decoder.layers.24.self_attention.linear_qkv.weight", "decoder.layers.24.self_attention.kv_layernorm.weight", "decoder.layers.25.self_attention.linear_qkv.weight", "decoder.layers.25.self_attention.kv_layernorm.weight", "decoder.layers.26.self_attention.linear_qkv.weight", "decoder.layers.26.self_attention.kv_layernorm.weight". 
-[rank12]:       Unexpected key(s) in state_dict: "decoder.layers.0.self_attention.linear_q_proj.weight", "decoder.layers.0.self_attention.linear_q_proj._extra_state", "decoder.layers.0.self_attention.linear_kv_down_proj.weight", "decoder.layers.0.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.1.self_attention.linear_q_proj.weight", "decoder.layers.1.self_attention.linear_q_proj._extra_state", "decoder.layers.1.self_attention.linear_kv_down_proj.weight", "decoder.layers.1.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.2.self_attention.linear_q_proj.weight", "decoder.layers.2.self_attention.linear_q_proj._extra_state", "decoder.layers.2.self_attention.linear_kv_down_proj.weight", "decoder.layers.2.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.3.self_attention.linear_q_proj.weight", "decoder.layers.3.self_attention.linear_q_proj._extra_state", "decoder.layers.3.self_attention.linear_kv_down_proj.weight", "decoder.layers.3.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.4.self_attention.linear_q_proj.weight", "decoder.layers.4.self_attention.linear_q_proj._extra_state", "decoder.layers.4.self_attention.linear_kv_down_proj.weight", "decoder.layers.4.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.5.self_attention.linear_q_proj.weight", "decoder.layers.5.self_attention.linear_q_proj._extra_state", "decoder.layers.5.self_attention.linear_kv_down_proj.weight", "decoder.layers.5.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.6.self_attention.linear_q_proj.weight", "decoder.layers.6.self_attention.linear_q_proj._extra_state", "decoder.layers.6.self_attention.linear_kv_down_proj.weight", "decoder.layers.6.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.7.self_attention.linear_q_proj.weight", "decoder.layers.7.self_attention.linear_q_proj._extra_state", "decoder.layers.7.self_attention.linear_kv_down_proj.weight", "decoder.layers.7.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.8.self_attention.linear_q_proj.weight", "decoder.layers.8.self_attention.linear_q_proj._extra_state", "decoder.layers.8.self_attention.linear_kv_down_proj.weight", "decoder.layers.8.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.9.self_attention.linear_q_proj.weight", "decoder.layers.9.self_attention.linear_q_proj._extra_state", "decoder.layers.9.self_attention.linear_kv_down_proj.weight", "decoder.layers.9.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.10.self_attention.linear_q_proj.weight", "decoder.layers.10.self_attention.linear_q_proj._extra_state", "decoder.layers.10.self_attention.linear_kv_down_proj.weight", "decoder.layers.10.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.11.self_attention.linear_q_proj.weight", "decoder.layers.11.self_attention.linear_q_proj._extra_state", "decoder.layers.11.self_attention.linear_kv_down_proj.weight", "decoder.layers.11.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.12.self_attention.linear_q_proj.weight", "decoder.layers.12.self_attention.linear_q_proj._extra_state", "decoder.layers.12.self_attention.linear_kv_down_proj.weight", "decoder.layers.12.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.13.self_attention.linear_q_proj.weight", "decoder.layers.13.self_attention.linear_q_proj._extra_state", "decoder.layers.13.self_attention.linear_kv_down_proj.weight", "decoder.layers.13.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.14.self_attention.linear_q_proj.weight", "decoder.layers.14.self_attention.linear_q_proj._extra_state", "decoder.layers.14.self_attention.linear_kv_down_proj.weight", "decoder.layers.14.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.15.self_attention.linear_q_proj.weight", "decoder.layers.15.self_attention.linear_q_proj._extra_state", "decoder.layers.15.self_attention.linear_kv_down_proj.weight", "decoder.layers.15.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.16.self_attention.linear_q_proj.weight", "decoder.layers.16.self_attention.linear_q_proj._extra_state", "decoder.layers.16.self_attention.linear_kv_down_proj.weight", "decoder.layers.16.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.17.self_attention.linear_q_proj.weight", "decoder.layers.17.self_attention.linear_q_proj._extra_state", "decoder.layers.17.self_attention.linear_kv_down_proj.weight", "decoder.layers.17.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.18.self_attention.linear_q_proj.weight", "decoder.layers.18.self_attention.linear_q_proj._extra_state", "decoder.layers.18.self_attention.linear_kv_down_proj.weight", "decoder.layers.18.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.19.self_attention.linear_q_proj.weight", "decoder.layers.19.self_attention.linear_q_proj._extra_state", "decoder.layers.19.self_attention.linear_kv_down_proj.weight", "decoder.layers.19.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.20.self_attention.linear_q_proj.weight", "decoder.layers.20.self_attention.linear_q_proj._extra_state", "decoder.layers.20.self_attention.linear_kv_down_proj.weight", "decoder.layers.20.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.21.self_attention.linear_q_proj.weight", "decoder.layers.21.self_attention.linear_q_proj._extra_state", "decoder.layers.21.self_attention.linear_kv_down_proj.weight", "decoder.layers.21.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.22.self_attention.linear_q_proj.weight", "decoder.layers.22.self_attention.linear_q_proj._extra_state", "decoder.layers.22.self_attention.linear_kv_down_proj.weight", "decoder.layers.22.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.23.self_attention.linear_q_proj.weight", "decoder.layers.23.self_attention.linear_q_proj._extra_state", "decoder.layers.23.self_attention.linear_kv_down_proj.weight", "decoder.layers.23.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.24.self_attention.linear_q_proj.weight", "decoder.layers.24.self_attention.linear_q_proj._extra_state", "decoder.layers.24.self_attention.linear_kv_down_proj.weight", "decoder.layers.24.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.25.self_attention.linear_q_proj.weight", "decoder.layers.25.self_attention.linear_q_proj._extra_state", "decoder.layers.25.self_attention.linear_kv_down_proj.weight", "decoder.layers.25.self_attention.linear_kv_up_proj.layer_norm_weight", "decoder.layers.26.self_attention.linear_q_proj.weight", "decoder.layers.26.self_attention.linear_q_proj._extra_state", "decoder.layers.26.self_attention.linear_kv_down_proj.weight", "decoder.layers.26.self_attention.linear_kv_up_proj.layer_norm_weight". 
-[ERROR] 2026-06-13-04:22:18 (PID:182836, Device:4, RankID:-1) ERR99999 UNKNOWN applicaiton exception
+rank56]:     args.model = get_model(model_provider, wrap_with_ddp=False)
+[rank56]:                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank56]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/training.py", line 238, in wrapper
+[rank56]:     model = fn(model_provider_func, model_type, wrap_with_ddp)
+[rank56]:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank56]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/training/training.py", line 942, in get_model
+[rank56]:     model = build_model()
+[rank56]:             ^^^^^^^^^^^^^
+[rank56]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/training/training.py", line 932, in build_model
+[rank56]:     model = model_provider_func(
+[rank56]:             ^^^^^^^^^^^^^^^^^^^^
+[rank56]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/training.py", line 142, in wrapper
+[rank56]:     model = model_provider_func(*args, **kwargs)
+[rank56]:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank56]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 70, in model_provider
+[rank56]:     transformer_layer_spec = import_module(args.spec)
+[rank56]:                              ^^^^^^^^^^^^^^^^^^^^^^^^
+[rank56]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/transformer/spec_utils.py", line 38, in import_module
+[rank56]:     module = __import__(base_path, globals(), locals(), [name])
+[rank56]:              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank56]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/models/spec/deepseek_spec.py", line 42, in <module>
+[rank56]:     mlp=_get_mlp_module_spec(
+[rank56]:         ^^^^^^^^^^^^^^^^^^^^^
+[rank56]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/models/gpt/gpt_layer_specs.py", line 288, in _get_mlp_module_spec
+[rank56]:     return get_mlp_module_spec(
+[rank56]:            ^^^^^^^^^^^^^^^^^^^^
+[rank56]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/models/gpt/gpt_layer_specs.py", line 322, in get_mlp_module_spec
+[rank56]:     return get_moe_module_spec(
+[rank56]:            ^^^^^^^^^^^^^^^^^^^^
+[rank56]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/models/gpt/moe_module_specs.py", line 37, in get_moe_module_spec
+[rank56]:     linear_fc1=TEColumnParallelLinear if use_te else ColumnParallelLinear,
+[rank56]:                ^^^^^^^^^^^^^^^^^^^^^^
+[rank56]: NameError: name 'TEColumnParallelLinear' is not defined. Did you mean: 'ColumnParallelLinear'?
+[rank48]: Traceback (most recent call last):
+[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 121, in <module>
+[rank48]:     main()
+[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/utils.py", line 1136, in wrapper
+[rank48]:     return func(*args, **kwargs)
+[rank48]:            ^^^^^^^^^^^^^^^^^^^^^
+[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 112, in main
+[rank48]:     model = MegatronModuleForCausalLM.from_pretrained(
+[rank48]:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 228, in from_pretrained
+[rank48]:     args.model = get_model(model_provider, wrap_with_ddp=False)
+[rank48]:                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/training.py", line 238, in wrapper
+[rank48]:     model = fn(model_provider_func, model_type, wrap_with_ddp)
+[rank48]:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/training/training.py", line 942, in get_model
+[rank48]:     model = build_model()
+[rank48]:             ^^^^^^^^^^^^^
+[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/training/training.py", line 932, in build_model
+[rank48]:     model = model_provider_func(
+[rank48]:             ^^^^^^^^^^^^^^^^^^^^
+[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/training.py", line 142, in wrapper
+[rank48]:     model = model_provider_func(*args, **kwargs)
+[rank48]:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 70, in model_provider
+[rank48]:     transformer_layer_spec = import_module(args.spec)
+[rank48]:                              ^^^^^^^^^^^^^^^^^^^^^^^^
+[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/transformer/spec_utils.py", line 38, in import_module
+[rank48]:     module = __import__(base_path, globals(), locals(), [name])
+[rank48]:              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/models/spec/deepseek_spec.py", line 42, in <module>
+[rank48]:     mlp=_get_mlp_module_spec(
+[rank48]:         ^^^^^^^^^^^^^^^^^^^^^
+[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/models/gpt/gpt_layer_specs.py", line 288, in _get_mlp_module_spec
+[rank48]:     return get_mlp_module_spec(
+[rank48]:            ^^^^^^^^^^^^^^^^^^^^
+[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/models/gpt/gpt_layer_specs.py", line 322, in get_mlp_module_spec
+[rank48]:     return get_moe_module_spec(
+[rank48]:            ^^^^^^^^^^^^^^^^^^^^
+[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/models/gpt/moe_module_specs.py", line 37, in get_moe_module_spec
+[rank48]:     linear_fc1=TEColumnParallelLinear if use_te else ColumnParallelLinear,
+[rank48]:                ^^^^^^^^^^^^^^^^^^^^^^
+[rank48]: NameError: name 'TEColumnParallelLinear' is not defined. Did you mean: 'ColumnParallelLinear'?
