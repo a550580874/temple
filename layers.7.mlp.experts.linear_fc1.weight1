@@ -1,76 +1,25 @@
-rank56]:     args.model = get_model(model_provider, wrap_with_ddp=False)
-[rank56]:                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank56]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/training.py", line 238, in wrapper
-[rank56]:     model = fn(model_provider_func, model_type, wrap_with_ddp)
-[rank56]:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank56]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/training/training.py", line 942, in get_model
-[rank56]:     model = build_model()
-[rank56]:             ^^^^^^^^^^^^^
-[rank56]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/training/training.py", line 932, in build_model
-[rank56]:     model = model_provider_func(
-[rank56]:             ^^^^^^^^^^^^^^^^^^^^
-[rank56]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/training.py", line 142, in wrapper
-[rank56]:     model = model_provider_func(*args, **kwargs)
-[rank56]:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank56]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 70, in model_provider
-[rank56]:     transformer_layer_spec = import_module(args.spec)
-[rank56]:                              ^^^^^^^^^^^^^^^^^^^^^^^^
-[rank56]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/transformer/spec_utils.py", line 38, in import_module
-[rank56]:     module = __import__(base_path, globals(), locals(), [name])
-[rank56]:              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank56]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/models/spec/deepseek_spec.py", line 42, in <module>
-[rank56]:     mlp=_get_mlp_module_spec(
-[rank56]:         ^^^^^^^^^^^^^^^^^^^^^
-[rank56]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/models/gpt/gpt_layer_specs.py", line 288, in _get_mlp_module_spec
-[rank56]:     return get_mlp_module_spec(
-[rank56]:            ^^^^^^^^^^^^^^^^^^^^
-[rank56]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/models/gpt/gpt_layer_specs.py", line 322, in get_mlp_module_spec
-[rank56]:     return get_moe_module_spec(
-[rank56]:            ^^^^^^^^^^^^^^^^^^^^
-[rank56]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/models/gpt/moe_module_specs.py", line 37, in get_moe_module_spec
-[rank56]:     linear_fc1=TEColumnParallelLinear if use_te else ColumnParallelLinear,
-[rank56]:                ^^^^^^^^^^^^^^^^^^^^^^
-[rank56]: NameError: name 'TEColumnParallelLinear' is not defined. Did you mean: 'ColumnParallelLinear'?
-[rank48]: Traceback (most recent call last):
-[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 121, in <module>
-[rank48]:     main()
-[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/utils.py", line 1136, in wrapper
-[rank48]:     return func(*args, **kwargs)
-[rank48]:            ^^^^^^^^^^^^^^^^^^^^^
-[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 112, in main
-[rank48]:     model = MegatronModuleForCausalLM.from_pretrained(
-[rank48]:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 228, in from_pretrained
-[rank48]:     args.model = get_model(model_provider, wrap_with_ddp=False)
-[rank48]:                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/training.py", line 238, in wrapper
-[rank48]:     model = fn(model_provider_func, model_type, wrap_with_ddp)
-[rank48]:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/training/training.py", line 942, in get_model
-[rank48]:     model = build_model()
-[rank48]:             ^^^^^^^^^^^^^
-[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/training/training.py", line 932, in build_model
-[rank48]:     model = model_provider_func(
-[rank48]:             ^^^^^^^^^^^^^^^^^^^^
-[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/training.py", line 142, in wrapper
-[rank48]:     model = model_provider_func(*args, **kwargs)
-[rank48]:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 70, in model_provider
-[rank48]:     transformer_layer_spec = import_module(args.spec)
-[rank48]:                              ^^^^^^^^^^^^^^^^^^^^^^^^
-[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/transformer/spec_utils.py", line 38, in import_module
-[rank48]:     module = __import__(base_path, globals(), locals(), [name])
-[rank48]:              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/models/spec/deepseek_spec.py", line 42, in <module>
-[rank48]:     mlp=_get_mlp_module_spec(
-[rank48]:         ^^^^^^^^^^^^^^^^^^^^^
-[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/models/gpt/gpt_layer_specs.py", line 288, in _get_mlp_module_spec
-[rank48]:     return get_mlp_module_spec(
-[rank48]:            ^^^^^^^^^^^^^^^^^^^^
-[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/models/gpt/gpt_layer_specs.py", line 322, in get_mlp_module_spec
-[rank48]:     return get_moe_module_spec(
-[rank48]:            ^^^^^^^^^^^^^^^^^^^^
-[rank48]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/models/gpt/moe_module_specs.py", line 37, in get_moe_module_spec
-[rank48]:     linear_fc1=TEColumnParallelLinear if use_te else ColumnParallelLinear,
-[rank48]:                ^^^^^^^^^^^^^^^^^^^^^^
-[rank48]: NameError: name 'TEColumnParallelLinear' is not defined. Did you mean: 'ColumnParallelLinear'?
+[rank62]:     raise type(e)(f"{str(e)} when instantiating {module.__name__}").with_traceback(
+[rank62]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/transformer/spec_utils.py", line 97, in build_module
+[rank62]:     return module(
+[rank62]:            ^^^^^^^
+[rank62]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/core/transformer/transformer_layer.py", line 96, in __init__
+[rank62]:     super().__init__(config=config,
+[rank62]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/transformer/transformer_layer.py", line 301, in __init__
+[rank62]:     self.self_attention = build_module(
+[rank62]:                           ^^^^^^^^^^^^^
+[rank62]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/transformer/spec_utils.py", line 104, in build_module
+[rank62]:     raise type(e)(f"{str(e)} when instantiating {module.__name__}").with_traceback(
+[rank62]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/transformer/spec_utils.py", line 97, in build_module
+[rank62]:     return module(
+[rank62]:            ^^^^^^^
+[rank62]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/models/transformer/multi_latent_attention.py", line 242, in __init__
+[rank62]:     self.linear_kv_up_proj = build_module(
+[rank62]:                              ^^^^^^^^^^^^^
+[rank62]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/transformer/spec_utils.py", line 104, in build_module
+[rank62]:     raise type(e)(f"{str(e)} when instantiating {module.__name__}").with_traceback(
+[rank62]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/transformer/spec_utils.py", line 97, in build_module
+[rank62]:     return module(
+[rank62]:            ^^^^^^^
+[rank62]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/tensor_parallel/layers.py", line 848, in __init__
+[rank62]:     raise RuntimeError(
+[rank62]: RuntimeError: ColumnParallelLinear was called with gradient_accumulation_fusion set to True but the custom CUDA extension fused_weight_gradient_mlp_cuda module is not found. To use gradient_accumulation_fusion you must install APEX with --cpp_ext and --cuda_ext. For example: pip install --global-option="--cpp_ext" --global-option="--cuda_ext ." Note that the extension requires CUDA>=11. Otherwise, you must turn off gradient accumulation fusion. when instantiating ColumnParallelLinear when instantiating CustomMLASelfAttention when instantiating TransformerLayer
