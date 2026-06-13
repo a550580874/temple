@@ -87,27 +87,39 @@ def _pack_legacy_experts_to_grouped(model_state):
             layer_ids.append(int(matched.group(1)))
 
     for layer_idx in sorted(set(layer_ids)):
-        router_key = f"decoder.layers.{layer_idx}.mlp.router.weight"
-        if router_key not in model_state:
+        fc1_pat = re.compile(
+            rf"decoder\.layers\.{layer_idx}\.mlp\.experts\.linear_fc1\.weight(\d+)$"
+        )
+        fc2_pat = re.compile(
+            rf"decoder\.layers\.{layer_idx}\.mlp\.experts\.linear_fc2\.weight(\d+)$"
+        )
+
+        fc1_items = []
+        fc2_items = []
+
+        for key, value in model_state.items():
+            matched = fc1_pat.match(key)
+            if matched is not None:
+                fc1_items.append((int(matched.group(1)), value))
+            matched = fc2_pat.match(key)
+            if matched is not None:
+                fc2_items.append((int(matched.group(1)), value))
+
+        fc1_items.sort(key=lambda x: x[0])
+        fc2_items.sort(key=lambda x: x[0])
+
+        if not fc1_items or not fc2_items:
+            continue
+        if len(fc1_items) != len(fc2_items):
             continue
 
-        num_experts = model_state[router_key].shape[0]
-
-        fc1_list = []
-        fc2_list = []
-        missing = False
-
-        for expert_idx in range(num_experts):
-            fc1_key = f"decoder.layers.{layer_idx}.mlp.experts.linear_fc1.weight{expert_idx}"
-            fc2_key = f"decoder.layers.{layer_idx}.mlp.experts.linear_fc2.weight{expert_idx}"
-            if fc1_key not in model_state or fc2_key not in model_state:
-                missing = True
-                break
-            fc1_list.append(model_state[fc1_key])
-            fc2_list.append(model_state[fc2_key])
-
-        if missing:
+        fc1_indices = [idx for idx, _ in fc1_items]
+        fc2_indices = [idx for idx, _ in fc2_items]
+        if fc1_indices != fc2_indices:
             continue
+
+        fc1_list = [value for _, value in fc1_items]
+        fc2_list = [value for _, value in fc2_items]
 
         weight1 = torch.cat([fc1.t().reshape(-1) for fc1 in fc1_list], dim=0).view(
             fc1_list[0].shape[1], -1
@@ -119,9 +131,16 @@ def _pack_legacy_experts_to_grouped(model_state):
         model_state[f"decoder.layers.{layer_idx}.mlp.experts.weight1"] = weight1
         model_state[f"decoder.layers.{layer_idx}.mlp.experts.weight2"] = weight2
 
-        for expert_idx in range(num_experts):
-            model_state.pop(f"decoder.layers.{layer_idx}.mlp.experts.linear_fc1.weight{expert_idx}", None)
-            model_state.pop(f"decoder.layers.{layer_idx}.mlp.experts.linear_fc2.weight{expert_idx}", None)
+        for expert_idx, _ in fc1_items:
+            model_state.pop(
+                f"decoder.layers.{layer_idx}.mlp.experts.linear_fc1.weight{expert_idx}",
+                None,
+            )
+        for expert_idx, _ in fc2_items:
+            model_state.pop(
+                f"decoder.layers.{layer_idx}.mlp.experts.linear_fc2.weight{expert_idx}",
+                None,
+            )
 
 
 def adapt_legacy_deepseek2_lite_checkpoint_if_needed(state_dict, args):
