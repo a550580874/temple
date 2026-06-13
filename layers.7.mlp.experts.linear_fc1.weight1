@@ -1,260 +1,35 @@
-[rank13]:     return func(*args, **kwargs)
-[rank13]:            ^^^^^^^^^^^^^^^^^^^^^
-[rank13]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 117, in main
-[rank13]:     task_factory(args, model)
-[rank13]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 63, in task_factory
-[rank13]:     task_map.get(task)(
-[rank13]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 262, in task_chat
-[rank13]:     responses = model.generate(
-[rank13]:                 ^^^^^^^^^^^^^^^
-[rank13]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 625, in generate
-[rank13]:     return self.infer_model.generate(input_ids=input_ids, **kwargs)
-[rank13]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank13]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 263, in generate
-[rank13]:     self._init_tokenizer(args)
-[rank13]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 488, in _init_tokenizer
-[rank13]:     eos_token_id = getattr(self.tokenizer, "eos", None)
-[rank13]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank13]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/datasets/megatron_tokenizer.py", line 145, in eos
-[rank13]:     raise NotImplementedError("{} has no attribute 'eos'".format(type(self).__name__))
-[rank13]: NotImplementedError: _HuggingFaceTokenizer has no attribute 'eos'
-[rank12]: Traceback (most recent call last):
-[rank12]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 121, in <module>
-[rank12]:     main()
-[rank12]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/utils.py", line 1136, in wrapper
-[rank12]:     return func(*args, **kwargs)
-[rank12]:            ^^^^^^^^^^^^^^^^^^^^^
-[rank12]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 117, in main
-[rank12]:     task_factory(args, model)
-[rank12]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 63, in task_factory
-[rank12]:     task_map.get(task)(
-[rank12]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 262, in task_chat
-[rank12]:     responses = model.generate(
-[rank12]:                 ^^^^^^^^^^^^^^^
-[rank12]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 625, in generate
-[rank12]:     return self.infer_model.generate(input_ids=input_ids, **kwargs)
-[rank12]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank12]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 263, in generate
-[rank12]:     self._init_tokenizer(args)
-[rank12]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 488, in _init_tokenizer
-[rank12]:     eos_token_id = getattr(self.tokenizer, "eos", None)
-[rank12]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank12]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/datasets/megatron_tokenizer.py", line 145, in eos
-[rank12]:     raise NotImplementedError("{} has no attribute 'eos'".format(type(self).__name__))
-[rank12]: NotImplementedError: _HuggingFaceTokenizer has no attribute 'eos'
-[rank7]: Traceback (most recent call last):
-[rank7]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 121, in <module>
-[rank7]:     main()
-[rank7]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/utils.py", line 1136, in wrapper
-[rank7]:     return func(*args, **kwargs)
-[rank7]:            ^^^^^^^^^^^^^^^^^^^^^
-[rank7]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 117, in main
-[rank7]:     task_factory(args, model)
-[rank7]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 63, in task_factory
-[rank7]:     task_map.get(task)(
-[rank7]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 262, in task_chat
-[rank7]:     responses = model.generate(
-[rank7]:                 ^^^^^^^^^^^^^^^
-[rank7]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 625, in generate
-[rank7]:     return self.infer_model.generate(input_ids=input_ids, **kwargs)
-[rank7]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank7]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 263, in generate
-[rank7]:     self._init_tokenizer(args)
-[rank7]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 488, in _init_tokenizer
-[rank7]:     eos_token_id = getattr(self.tokenizer, "eos", None)
-[rank7]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank7]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/datasets/megatron_tokenizer.py", line 145, in eos
-[rank7]:     raise NotImplementedError("{} has no attribute 'eos'".format(type(self).__name__))
-[rank7]: NotImplementedError: _HuggingFaceTokenizer has no attribute 'eos'
-[rank6]: Traceback (most recent call last):
-[rank6]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 121, in <module>
-[rank6]:     main()
-[rank6]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/utils.py", line 1136, in wrapper
-[rank6]:     return func(*args, **kwargs)
-[rank6]:            ^^^^^^^^^^^^^^^^^^^^^
-[rank6]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 117, in main
-[rank6]:     task_factory(args, model)
-[rank6]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 63, in task_factory
-[rank6]:     task_map.get(task)(
-[rank6]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 262, in task_chat
-[rank6]:     responses = model.generate(
-[rank6]:                 ^^^^^^^^^^^^^^^
-[rank6]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 625, in generate
-[rank6]:     return self.infer_model.generate(input_ids=input_ids, **kwargs)
-[rank6]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank6]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 263, in generate
-[rank6]:     self._init_tokenizer(args)
-[rank6]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 488, in _init_tokenizer
-[rank6]:     eos_token_id = getattr(self.tokenizer, "eos", None)
-[rank6]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank6]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/datasets/megatron_tokenizer.py", line 145, in eos
-[rank6]:     raise NotImplementedError("{} has no attribute 'eos'".format(type(self).__name__))
-[rank6]: NotImplementedError: _HuggingFaceTokenizer has no attribute 'eos'
-[rank3]: Traceback (most recent call last):
-[rank3]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 121, in <module>
-[rank3]:     main()
-[rank3]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/utils.py", line 1136, in wrapper
-[rank3]:     return func(*args, **kwargs)
-[rank3]:            ^^^^^^^^^^^^^^^^^^^^^
-[rank3]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 117, in main
-[rank3]:     task_factory(args, model)
-[rank3]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 63, in task_factory
-[rank3]:     task_map.get(task)(
-[rank3]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 262, in task_chat
-[rank3]:     responses = model.generate(
-[rank3]:                 ^^^^^^^^^^^^^^^
-[rank3]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 625, in generate
-[rank3]:     return self.infer_model.generate(input_ids=input_ids, **kwargs)
-[rank3]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank3]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 263, in generate
-[rank3]:     self._init_tokenizer(args)
-[rank3]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 488, in _init_tokenizer
-[rank3]:     eos_token_id = getattr(self.tokenizer, "eos", None)
-[rank3]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank3]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/datasets/megatron_tokenizer.py", line 145, in eos
-[rank3]:     raise NotImplementedError("{} has no attribute 'eos'".format(type(self).__name__))
-[rank3]: NotImplementedError: _HuggingFaceTokenizer has no attribute 'eos'
-[rank1]: Traceback (most recent call last):
-[rank1]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 121, in <module>
-[rank1]:     main()
-[rank1]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/utils.py", line 1136, in wrapper
-[rank1]:     return func(*args, **kwargs)
-[rank1]:            ^^^^^^^^^^^^^^^^^^^^^
-[rank1]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 117, in main
-[rank1]:     task_factory(args, model)
-[rank1]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 63, in task_factory
-[rank1]:     task_map.get(task)(
-[rank1]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 262, in task_chat
-[rank1]:     responses = model.generate(
-[rank1]:                 ^^^^^^^^^^^^^^^
-[rank1]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 625, in generate
-[rank1]:     return self.infer_model.generate(input_ids=input_ids, **kwargs)
-[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank1]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 263, in generate
-[rank1]:     self._init_tokenizer(args)
-[rank1]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 488, in _init_tokenizer
-[rank1]:     eos_token_id = getattr(self.tokenizer, "eos", None)
-[rank1]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank1]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/datasets/megatron_tokenizer.py", line 145, in eos
-[rank1]:     raise NotImplementedError("{} has no attribute 'eos'".format(type(self).__name__))
-[rank1]: NotImplementedError: _HuggingFaceTokenizer has no attribute 'eos'
-[rank2]: Traceback (most recent call last):
-[rank2]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 121, in <module>
-[rank2]:     main()
-[rank2]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/utils.py", line 1136, in wrapper
-[rank2]:     return func(*args, **kwargs)
-[rank2]:            ^^^^^^^^^^^^^^^^^^^^^
-[rank2]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 117, in main
-[rank2]:     task_factory(args, model)
-[rank2]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 63, in task_factory
-[rank2]:     task_map.get(task)(
-[rank2]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 262, in task_chat
-[rank2]:     responses = model.generate(
-[rank2]:                 ^^^^^^^^^^^^^^^
-[rank2]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 625, in generate
-[rank2]:     return self.infer_model.generate(input_ids=input_ids, **kwargs)
-[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank2]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 263, in generate
-[rank2]:     self._init_tokenizer(args)
-[rank2]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 488, in _init_tokenizer
-[rank2]:     eos_token_id = getattr(self.tokenizer, "eos", None)
-[rank2]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank2]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/datasets/megatron_tokenizer.py", line 145, in eos
-[rank2]:     raise NotImplementedError("{} has no attribute 'eos'".format(type(self).__name__))
-[rank2]: NotImplementedError: _HuggingFaceTokenizer has no attribute 'eos'
-[rank10]: Traceback (most recent call last):
-[rank10]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 121, in <module>
-[rank10]:     main()
-[rank10]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/utils.py", line 1136, in wrapper
-[rank10]:     return func(*args, **kwargs)
-[rank10]:            ^^^^^^^^^^^^^^^^^^^^^
-[rank10]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 117, in main
-[rank10]:     task_factory(args, model)
-[rank10]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 63, in task_factory
-[rank10]:     task_map.get(task)(
-[rank10]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 262, in task_chat
-[rank10]:     responses = model.generate(
-[rank10]:                 ^^^^^^^^^^^^^^^
-[rank10]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 625, in generate
-[rank10]:     return self.infer_model.generate(input_ids=input_ids, **kwargs)
-[rank10]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank10]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 263, in generate
-[rank10]:     self._init_tokenizer(args)
-[rank10]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 488, in _init_tokenizer
-[rank10]:     eos_token_id = getattr(self.tokenizer, "eos", None)
-[rank10]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank10]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/datasets/megatron_tokenizer.py", line 145, in eos
-[rank10]:     raise NotImplementedError("{} has no attribute 'eos'".format(type(self).__name__))
-[rank10]: NotImplementedError: _HuggingFaceTokenizer has no attribute 'eos'
-[rank15]: Traceback (most recent call last):
-[rank15]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 121, in <module>
-[rank15]:     main()
-[rank15]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/utils.py", line 1136, in wrapper
-[rank15]:     return func(*args, **kwargs)
-[rank15]:            ^^^^^^^^^^^^^^^^^^^^^
-[rank15]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 117, in main
-[rank15]:     task_factory(args, model)
-[rank15]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 63, in task_factory
-[rank15]:     task_map.get(task)(
-[rank15]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 262, in task_chat
-[rank15]:     responses = model.generate(
-[rank15]:                 ^^^^^^^^^^^^^^^
-[rank15]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 625, in generate
-[rank15]:     return self.infer_model.generate(input_ids=input_ids, **kwargs)
-[rank15]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank15]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 263, in generate
-[rank15]:     self._init_tokenizer(args)
-[rank15]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 488, in _init_tokenizer
-[rank15]:     eos_token_id = getattr(self.tokenizer, "eos", None)
-[rank15]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank15]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/datasets/megatron_tokenizer.py", line 145, in eos
-[rank15]:     raise NotImplementedError("{} has no attribute 'eos'".format(type(self).__name__))
-[rank15]: NotImplementedError: _HuggingFaceTokenizer has no attribute 'eos'
-[rank8]: Traceback (most recent call last):
-[rank8]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 121, in <module>
-[rank8]:     main()
-[rank8]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/utils.py", line 1136, in wrapper
-[rank8]:     return func(*args, **kwargs)
-[rank8]:            ^^^^^^^^^^^^^^^^^^^^^
-[rank8]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 117, in main
-[rank8]:     task_factory(args, model)
-[rank8]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 63, in task_factory
-[rank8]:     task_map.get(task)(
-[rank8]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 262, in task_chat
-[rank8]:     responses = model.generate(
-[rank8]:                 ^^^^^^^^^^^^^^^
-[rank8]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 625, in generate
-[rank8]:     return self.infer_model.generate(input_ids=input_ids, **kwargs)
-[rank8]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank8]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 263, in generate
-[rank8]:     self._init_tokenizer(args)
-[rank8]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 488, in _init_tokenizer
-[rank8]:     eos_token_id = getattr(self.tokenizer, "eos", None)
-[rank8]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank8]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/datasets/megatron_tokenizer.py", line 145, in eos
-[rank8]:     raise NotImplementedError("{} has no attribute 'eos'".format(type(self).__name__))
-[rank8]: NotImplementedError: _HuggingFaceTokenizer has no attribute 'eos'
-[rank4]: Traceback (most recent call last):
-[rank4]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 121, in <module>
-[rank4]:     main()
-[rank4]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/utils.py", line 1136, in wrapper
-[rank4]:     return func(*args, **kwargs)
-[rank4]:            ^^^^^^^^^^^^^^^^^^^^^
-[rank4]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 117, in main
-[rank4]:     task_factory(args, model)
-[rank4]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 63, in task_factory
-[rank4]:     task_map.get(task)(
-[rank4]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 262, in task_chat
-[rank4]:     responses = model.generate(
-[rank4]:                 ^^^^^^^^^^^^^^^
-[rank4]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 625, in generate
-[rank4]:     return self.infer_model.generate(input_ids=input_ids, **kwargs)
-[rank4]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank4]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 263, in generate
-[rank4]:     self._init_tokenizer(args)
-[rank4]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 488, in _init_tokenizer
-[rank4]:     eos_token_id = getattr(self.tokenizer, "eos", None)
-[rank4]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[rank4]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/megatron/core/datasets/megatron_tokenizer.py", line 145, in eos
-[rank4]:     raise NotImplementedError("{} has no attribute 'eos'".format(type(self).__name__))
-[rank4]: NotImplementedError: _HuggingFaceTokenizer has no attribute 'eos'
+You >> nihao
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 121, in <module>
+[rank0]:     main()
+[rank0]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/training/utils.py", line 1136, in wrapper
+[rank0]:     return func(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/inference.py", line 117, in main
+[rank0]:     task_factory(args, model)
+[rank0]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 63, in task_factory
+[rank0]:     task_map.get(task)(
+[rank0]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/infer_base.py", line 262, in task_chat
+[rank0]:     responses = model.generate(
+[rank0]:                 ^^^^^^^^^^^^^^^
+[rank0]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 628, in generate
+[rank0]:     return self.infer_model.generate(input_ids=input_ids, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/tasks/inference/module.py", line 268, in generate
+[rank0]:     context_tokens_tensor, context_length_tensor = self.tokenize_prompts(
+[rank0]:                                                    ^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/inference/text_generation/tokenization.py", line 98, in tokenize_prompts
+[rank0]:     _tokenize_prompts_and_batch(tokenizer, prompts, tokens_to_generate, max_generate_length, add_BOS)
+[rank0]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/inference/text_generation/tokenization.py", line 151, in _tokenize_prompts_and_batch
+[rank0]:     prompts_tokens = _encode_no_template(tokenizer, prompts)
+[rank0]:                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/apdcephfs_nj11/share_304376610/lqc/MindSpeed-LLM/mindspeed_llm/inference/text_generation/tokenization.py", line 29, in _encode_no_template
+[rank0]:     prompts_tokens = [tokenizer.encode(prompts)]
+[rank0]:                       ^^^^^^^^^^^^^^^^
+[rank0]: AttributeError: '_HuggingFaceTokenizer' object has no attribute 'encode'
+[ERROR] 2026-06-13-06:52:22 (PID:195160, Device:0, RankID:-1) ERR99999 UNKNOWN applicaiton exception
+Exception ignored in: <function ResourceTracker.__del__ at 0x7f097d2fbba0>
+Traceback (most recent call last):
+  File "/usr/local/python3.12/lib/python3.12/site-packages/multiprocess/resource_tracker.py", line 80, in __del__
+  File "/usr/local/python3.12/lib/python3.12/site-packages/multiprocess/resource_tracker.py", line 89, in _stop
+  File "/usr/local/python3.12/lib/python3.12/site-packages/multiprocess/res
