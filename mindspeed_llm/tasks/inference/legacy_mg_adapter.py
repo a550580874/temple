@@ -40,71 +40,88 @@ def _has_grouped_expert_schema(model_state):
     )
 
 
-def _ensure_router_expert_bias(model_state):
-    router_weight_pat = re.compile(r"decoder\.layers\.(\d+)\.mlp\.router\.weight$")
-    bias_tpl = "decoder.layers.{layer_idx}.mlp.router.expert_bias"
-
-    for key, value in list(model_state.items()):
-        matched = router_weight_pat.match(key)
-        if matched is None:
-            continue
-        layer_idx = matched.group(1)
-        bias_key = bias_tpl.format(layer_idx=layer_idx)
-        if bias_key not in model_state:
-            num_experts = value.shape[0]
-            model_state[bias_key] = torch.zeros(
-                num_experts, dtype=torch.float32, device=value.device
-            )
-
-
-def _alias_layer0_dense_norm_if_needed(model_state):
+def _alias_layer0_norm(model_state):
     src_key = "decoder.layers.0.mlp.linear_fc1.layer_norm_weight"
     dst_key = "decoder.layers.0.pre_mlp_layernorm.weight"
     if src_key in model_state and dst_key not in model_state:
         model_state[dst_key] = model_state[src_key].clone()
+    model_state.pop(src_key, None)
 
 
-def _convert_grouped_experts_to_legacy_flat(model_state):
-    weight1_pat = re.compile(r"decoder\.layers\.(\d+)\.mlp\.experts\.weight1$")
-    weight2_pat = re.compile(r"decoder\.layers\.(\d+)\.mlp\.experts\.weight2$")
+def _pack_legacy_attention_to_runtime(model_state):
+    q_proj_pat = re.compile(r"decoder\.layers\.(\d+)\.self_attention\.linear_q_proj\.weight$")
 
-    layer_ids = set()
-    for key in model_state.keys():
-        matched = weight1_pat.match(key)
-        if matched:
-            layer_ids.add(int(matched.group(1)))
-        matched = weight2_pat.match(key)
-        if matched:
-            layer_ids.add(int(matched.group(1)))
-
-    for layer_idx in sorted(layer_ids):
-        w1_key = f"decoder.layers.{layer_idx}.mlp.experts.weight1"
-        w2_key = f"decoder.layers.{layer_idx}.mlp.experts.weight2"
-        router_key = f"decoder.layers.{layer_idx}.mlp.router.weight"
-
-        if w1_key not in model_state or w2_key not in model_state or router_key not in model_state:
+    for key in list(model_state.keys()):
+        matched = q_proj_pat.match(key)
+        if matched is None:
             continue
 
-        weight1 = model_state.pop(w1_key)
-        weight2 = model_state.pop(w2_key)
-        router_weight = model_state[router_key]
+        layer_idx = matched.group(1)
+        q_key = f"decoder.layers.{layer_idx}.self_attention.linear_q_proj.weight"
+        kv_down_key = f"decoder.layers.{layer_idx}.self_attention.linear_kv_down_proj.weight"
+        kv_ln_src_key = f"decoder.layers.{layer_idx}.self_attention.linear_kv_up_proj.layer_norm_weight"
 
-        num_experts = router_weight.shape[0]
-        hidden_size = weight1.shape[0]
+        qkv_dst_key = f"decoder.layers.{layer_idx}.self_attention.linear_qkv.weight"
+        kv_ln_dst_key = f"decoder.layers.{layer_idx}.self_attention.kv_layernorm.weight"
 
-        flat_fc1_list = torch.chunk(weight1.reshape(-1), num_experts, dim=0)
-        flat_fc2_list = torch.chunk(weight2.reshape(-1), num_experts, dim=0)
+        if q_key in model_state and kv_down_key in model_state and qkv_dst_key not in model_state:
+            q_proj = model_state[q_key]
+            kv_down_proj = model_state[kv_down_key]
+            model_state[qkv_dst_key] = torch.cat([q_proj, kv_down_proj], dim=0).contiguous()
+
+        if kv_ln_src_key in model_state and kv_ln_dst_key not in model_state:
+            model_state[kv_ln_dst_key] = model_state[kv_ln_src_key].clone()
+
+        model_state.pop(q_key, None)
+        model_state.pop(kv_down_key, None)
+        model_state.pop(kv_ln_src_key, None)
+
+
+def _pack_legacy_experts_to_grouped(model_state):
+    layer_pat = re.compile(r"decoder\.layers\.(\d+)\.mlp\.experts\.linear_fc1\.weight0$")
+
+    layer_ids = []
+    for key in model_state.keys():
+        matched = layer_pat.match(key)
+        if matched is not None:
+            layer_ids.append(int(matched.group(1)))
+
+    for layer_idx in sorted(set(layer_ids)):
+        router_key = f"decoder.layers.{layer_idx}.mlp.router.weight"
+        if router_key not in model_state:
+            continue
+
+        num_experts = model_state[router_key].shape[0]
+
+        fc1_list = []
+        fc2_list = []
+        missing = False
 
         for expert_idx in range(num_experts):
-            fc1 = flat_fc1_list[expert_idx].view(hidden_size, -1).t().contiguous()
-            fc2 = flat_fc2_list[expert_idx].view(-1, hidden_size).t().contiguous()
+            fc1_key = f"decoder.layers.{layer_idx}.mlp.experts.linear_fc1.weight{expert_idx}"
+            fc2_key = f"decoder.layers.{layer_idx}.mlp.experts.linear_fc2.weight{expert_idx}"
+            if fc1_key not in model_state or fc2_key not in model_state:
+                missing = True
+                break
+            fc1_list.append(model_state[fc1_key])
+            fc2_list.append(model_state[fc2_key])
 
-            model_state[
-                f"decoder.layers.{layer_idx}.mlp.experts.linear_fc1.weight{expert_idx}"
-            ] = fc1
-            model_state[
-                f"decoder.layers.{layer_idx}.mlp.experts.linear_fc2.weight{expert_idx}"
-            ] = fc2
+        if missing:
+            continue
+
+        weight1 = torch.cat([fc1.t().reshape(-1) for fc1 in fc1_list], dim=0).view(
+            fc1_list[0].shape[1], -1
+        ).contiguous()
+        weight2 = torch.cat([fc2.t().reshape(-1) for fc2 in fc2_list], dim=0).view(
+            -1, fc2_list[0].shape[0]
+        ).contiguous()
+
+        model_state[f"decoder.layers.{layer_idx}.mlp.experts.weight1"] = weight1
+        model_state[f"decoder.layers.{layer_idx}.mlp.experts.weight2"] = weight2
+
+        for expert_idx in range(num_experts):
+            model_state.pop(f"decoder.layers.{layer_idx}.mlp.experts.linear_fc1.weight{expert_idx}", None)
+            model_state.pop(f"decoder.layers.{layer_idx}.mlp.experts.linear_fc2.weight{expert_idx}", None)
 
 
 def adapt_legacy_deepseek2_lite_checkpoint_if_needed(state_dict, args):
@@ -116,18 +133,17 @@ def adapt_legacy_deepseek2_lite_checkpoint_if_needed(state_dict, args):
     if model_type_hf not in (None, "deepseek2-lite"):
         return state_dict
 
-    is_legacy = _is_legacy_deepseek2_lite_schema(model_state)
-    is_grouped = _has_grouped_expert_schema(model_state)
-    if not is_legacy and not is_grouped:
+    if _has_grouped_expert_schema(model_state):
+        return state_dict
+
+    if not _is_legacy_deepseek2_lite_schema(model_state):
         return state_dict
 
     state_dict = copy.deepcopy(state_dict)
     model_state = state_dict["model"]
 
-    _alias_layer0_dense_norm_if_needed(model_state)
-    _ensure_router_expert_bias(model_state)
-
-    if _has_grouped_expert_schema(model_state):
-        _convert_grouped_experts_to_legacy_flat(model_state)
+    _alias_layer0_norm(model_state)
+    _pack_legacy_attention_to_runtime(model_state)
+    _pack_legacy_experts_to_grouped(model_state)
 
     return state_dict
