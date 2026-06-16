@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor
 
 import torch
 
@@ -44,6 +45,21 @@ def parse_args():
         "--dry-run",
         action="store_true",
         help="Only validate and print the rewrite plan without writing files.",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="How many target distrib_optim.pt files to rewrite in parallel.",
+    )
+    parser.add_argument(
+        "--path-contains",
+        action="append",
+        default=[],
+        help=(
+            "Only process distrib_optim.pt paths whose relative path contains this string. "
+            "Can be provided multiple times, e.g. --path-contains mp_rank_00_001."
+        ),
     )
     return parser.parse_args()
 
@@ -98,6 +114,17 @@ def _discover_optimizer_files(root_dir):
         if "distrib_optim.pt" in files:
             paths.append(os.path.join(current_root, "distrib_optim.pt"))
     return sorted(paths)
+
+
+def _filter_optimizer_paths(paths, root_dir, filters):
+    if not filters:
+        return paths
+    selected = []
+    for path in paths:
+        rel_path = os.path.relpath(path, root_dir)
+        if any(token in rel_path for token in filters):
+            selected.append(path)
+    return selected
 
 
 def _hardlink_or_copy(src, dst, mode):
@@ -205,6 +232,53 @@ def _build_module_rewrite_plan(changed_pairs, old_param_map, new_param_map):
     return module_plans
 
 
+def _rewrite_target_rank(
+    target_rank,
+    target_path,
+    rank_to_modules,
+    input_optim_paths,
+):
+    target_state = copy.deepcopy(torch.load(target_path, map_location="cpu"))
+    source_state_cache = {}
+
+    for module_plan in rank_to_modules[target_rank]:
+        for tensor_key in OPTIM_KEYS:
+            source_chunks = []
+            for old_entry in module_plan["old_entries"]:
+                source_rank = old_entry["rank"]
+                source_path = input_optim_paths[source_rank]
+                if source_rank not in source_state_cache:
+                    source_state_cache[source_rank] = torch.load(source_path, map_location="cpu")
+                source_state = source_state_cache[source_rank]
+                source_tensor = _get_world_tensor(source_state, old_entry, tensor_key)
+                start = old_entry["gbuf_world"]["start"]
+                end = old_entry["gbuf_world"]["end"]
+                source_chunks.append(source_tensor[start:end].clone())
+
+            module_blob = torch.cat(source_chunks, dim=0)
+            cursor = 0
+
+            for new_entry in module_plan["new_entries"]:
+                target_start = new_entry["gbuf_world"]["start"]
+                target_end = new_entry["gbuf_world"]["end"]
+                chunk_size = target_end - target_start
+                if new_entry["rank"] == target_rank:
+                    target_tensor = _get_world_tensor(target_state, new_entry, tensor_key)
+                    target_tensor[target_start:target_end].copy_(
+                        module_blob[cursor : cursor + chunk_size]
+                    )
+                cursor += chunk_size
+
+            if cursor != module_blob.numel():
+                raise ValueError(
+                    f"Module {module_plan['module_prefix']} key={tensor_key} "
+                    f"consumed {cursor} elements but source blob has {module_blob.numel()}."
+                )
+
+    torch.save(target_state, target_path)
+    return target_path
+
+
 def main():
     args = parse_args()
 
@@ -276,52 +350,41 @@ def main():
     if len(output_optim_paths) != len(input_optim_paths):
         raise ValueError("Output checkpoint tree does not contain the expected distrib_optim.pt files.")
 
-    source_state_cache = {}
-    target_state_cache = {}
+    selected_output_paths = _filter_optimizer_paths(output_optim_paths, args.output_root, args.path_contains)
+    if args.path_contains and not selected_output_paths:
+        raise ValueError(
+            f"No distrib_optim.pt matched --path-contains filters: {args.path_contains}"
+        )
 
+    selected_target_ranks = {
+        rank for rank, path in enumerate(output_optim_paths) if path in selected_output_paths
+    }
+    rank_to_modules = defaultdict(list)
     for module_plan in module_plans:
-        for tensor_key in OPTIM_KEYS:
-            source_chunks = []
-            for old_entry in module_plan["old_entries"]:
-                source_rank = old_entry["rank"]
-                source_path = input_optim_paths[source_rank]
-                if source_rank not in source_state_cache:
-                    source_state_cache[source_rank] = torch.load(source_path, map_location="cpu")
-                source_state = source_state_cache[source_rank]
-                source_tensor = _get_world_tensor(source_state, old_entry, tensor_key)
-                start = old_entry["gbuf_world"]["start"]
-                end = old_entry["gbuf_world"]["end"]
-                source_chunks.append(source_tensor[start:end].clone())
+        for rank in {entry["rank"] for entry in module_plan["new_entries"]}:
+            if rank in selected_target_ranks:
+                rank_to_modules[rank].append(module_plan)
 
-            module_blob = torch.cat(source_chunks, dim=0)
-            cursor = 0
+    if not rank_to_modules:
+        print("No target ranks matched the selected filters.")
+        return
 
-            for new_entry in module_plan["new_entries"]:
-                target_rank = new_entry["rank"]
-                target_path = output_optim_paths[target_rank]
-                if target_rank not in target_state_cache:
-                    target_state_cache[target_rank] = copy.deepcopy(
-                        torch.load(target_path, map_location="cpu")
-                    )
-                target_state = target_state_cache[target_rank]
-                target_tensor = _get_world_tensor(target_state, new_entry, tensor_key)
+    workers = max(1, args.workers)
+    tasks = [
+        (target_rank, output_optim_paths[target_rank], rank_to_modules, input_optim_paths)
+        for target_rank in sorted(rank_to_modules)
+    ]
 
-                target_start = new_entry["gbuf_world"]["start"]
-                target_end = new_entry["gbuf_world"]["end"]
-                chunk_size = target_end - target_start
-                target_tensor[target_start:target_end].copy_(module_blob[cursor : cursor + chunk_size])
-                cursor += chunk_size
-
-            if cursor != module_blob.numel():
-                raise ValueError(
-                    f"Module {module_plan['module_prefix']} key={tensor_key} consumed {cursor} "
-                    f"elements but source blob has {module_blob.numel()} elements."
-                )
-
-    for target_rank, target_state in sorted(target_state_cache.items()):
-        target_path = output_optim_paths[target_rank]
-        torch.save(target_state, target_path)
-        print(f"[write] rewrote {target_path}")
+    if workers == 1:
+        for task in tasks:
+            target_path = _rewrite_target_rank(*task)
+            print(f"[write] rewrote {target_path}")
+    else:
+        with ProcessPoolExecutor(max_workers=workers) as executor:
+            futures = [executor.submit(_rewrite_target_rank, *task) for task in tasks]
+            for future in futures:
+                target_path = future.result()
+                print(f"[write] rewrote {target_path}")
 
 
 if __name__ == "__main__":
