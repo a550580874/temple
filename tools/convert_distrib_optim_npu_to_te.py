@@ -66,7 +66,7 @@ def parse_args():
 
 def _load_dump_dir(dump_dir):
     rank_to_entries = {}
-    param_to_entry = {}
+    all_entries = []
 
     for filename in sorted(os.listdir(dump_dir)):
         if not filename.startswith("optimizer_bucket_map_rank") or not filename.endswith(".json"):
@@ -83,10 +83,10 @@ def _load_dump_dir(dump_dir):
                     **entry,
                 }
                 entries.append(full_entry)
-                param_to_entry[entry["param_name"]] = full_entry
+                all_entries.append(full_entry)
         rank_to_entries[rank] = entries
 
-    return rank_to_entries, param_to_entry
+    return rank_to_entries, all_entries
 
 
 def _entry_signature(entry):
@@ -204,29 +204,51 @@ def _sort_entries_for_layout(entries):
     )
 
 
-def _build_module_rewrite_plan(changed_pairs, old_param_map, new_param_map):
-    changed_modules = {
-        prefix
-        for param_name, _, _ in changed_pairs
-        for prefix in [_module_prefix(param_name)]
-        if prefix is not None
-    }
+def _group_entries_by_module(entries):
+    grouped = defaultdict(list)
+    for entry in entries:
+        prefix = _module_prefix(entry["param_name"])
+        if prefix is None:
+            continue
+        grouped[prefix].append(entry)
+    return grouped
+
+
+def _entry_row_signature(entry):
+    return (
+        entry["param_name"],
+        entry["rank"],
+        entry["gbuf_idx"],
+        entry["bucket_idx"],
+        entry["dtype"],
+        entry["gbuf_world"]["start"],
+        entry["gbuf_world"]["end"],
+    )
+
+
+def _build_changed_modules(old_entries, new_entries):
+    old_grouped = _group_entries_by_module(old_entries)
+    new_grouped = _group_entries_by_module(new_entries)
+    module_prefixes = sorted(set(old_grouped) | set(new_grouped))
+    changed_modules = []
+    changed_rows = []
+
+    for module_prefix in module_prefixes:
+        old_rows = sorted(_entry_row_signature(entry) for entry in old_grouped.get(module_prefix, []))
+        new_rows = sorted(_entry_row_signature(entry) for entry in new_grouped.get(module_prefix, []))
+        if old_rows != new_rows:
+            changed_modules.append(module_prefix)
+            changed_rows.extend(old_rows)
+            changed_rows.extend(new_rows)
+
+    return changed_modules, old_grouped, new_grouped, changed_rows
+
+
+def _build_module_rewrite_plan_from_groups(changed_modules, old_grouped, new_grouped):
     module_plans = []
-    for module_prefix in sorted(changed_modules):
-        old_entries = _sort_entries_for_layout(
-            [
-                entry
-                for name, entry in old_param_map.items()
-                if _module_prefix(name) == module_prefix
-            ]
-        )
-        new_entries = _sort_entries_for_layout(
-            [
-                entry
-                for name, entry in new_param_map.items()
-                if _module_prefix(name) == module_prefix
-            ]
-        )
+    for module_prefix in changed_modules:
+        old_entries = _sort_entries_for_layout(old_grouped.get(module_prefix, []))
+        new_entries = _sort_entries_for_layout(new_grouped.get(module_prefix, []))
         old_total = sum(entry["gbuf_world"]["size"] for entry in old_entries)
         new_total = sum(entry["gbuf_world"]["size"] for entry in new_entries)
         if old_total != new_total:
@@ -298,32 +320,25 @@ def main():
     if os.path.abspath(args.input_root) == os.path.abspath(args.output_root):
         raise ValueError("--input-root and --output-root must be different.")
 
-    old_rank_entries, old_param_map = _load_dump_dir(args.old_dump_dir)
-    new_rank_entries, new_param_map = _load_dump_dir(args.new_dump_dir)
+    old_rank_entries, old_entries = _load_dump_dir(args.old_dump_dir)
+    new_rank_entries, new_entries = _load_dump_dir(args.new_dump_dir)
 
-    old_names = set(old_param_map)
-    new_names = set(new_param_map)
-    if old_names != new_names:
-        only_old = sorted(old_names - new_names)[:10]
-        only_new = sorted(new_names - old_names)[:10]
+    if len(old_entries) != len(new_entries):
         raise ValueError(
-            "Old/new dump parameter sets differ. "
-            f"only_old(sample)={only_old}, only_new(sample)={only_new}"
+            f"Old/new dump entry counts differ: {len(old_entries)} vs {len(new_entries)}"
         )
 
-    changed_pairs = []
-    for param_name in sorted(old_names):
-        old_entry = old_param_map[param_name]
-        new_entry = new_param_map[param_name]
-        if _entry_signature(old_entry) != _entry_signature(new_entry):
-            _validate_entry_pair(param_name, old_entry, new_entry)
-            changed_pairs.append((param_name, old_entry, new_entry))
+    changed_modules, old_grouped, new_grouped, changed_rows = _build_changed_modules(
+        old_entries, new_entries
+    )
 
-    if not changed_pairs:
+    if not changed_modules:
         print("No distributed optimizer slice changes detected between old/new dumps.")
         return
 
-    module_plans = _build_module_rewrite_plan(changed_pairs, old_param_map, new_param_map)
+    module_plans = _build_module_rewrite_plan_from_groups(
+        changed_modules, old_grouped, new_grouped
+    )
 
     input_optim_paths = _discover_optimizer_files(args.input_root)
     if not input_optim_paths:
@@ -335,6 +350,14 @@ def main():
             f"Found {len(input_optim_paths)} distrib_optim.pt files but dump ranks span 0..{rank_count - 1}. "
             "This script currently assumes one distrib_optim.pt per dump rank."
         )
+
+    changed_pairs = []
+    for module_prefix in changed_modules:
+        old_sorted = _sort_entries_for_layout(old_grouped.get(module_prefix, []))
+        new_sorted = _sort_entries_for_layout(new_grouped.get(module_prefix, []))
+        for old_entry, new_entry in zip(old_sorted, new_sorted):
+            if _entry_signature(old_entry) != _entry_signature(new_entry):
+                changed_pairs.append((old_entry["param_name"], old_entry, new_entry))
 
     summary = _summarize_plan(changed_pairs)
     summary["changed_module_count"] = len(module_plans)
