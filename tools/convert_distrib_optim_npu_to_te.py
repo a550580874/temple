@@ -172,6 +172,26 @@ def _get_world_tensor(state_dict, entry, tensor_key):
     return gbuf_state[dtype_key][tensor_key]
 
 
+def _entry_fits_state_dict(state_dict, entry):
+    try:
+        gbuf_state = state_dict[entry["gbuf_idx"]]
+    except Exception:
+        return False
+    if gbuf_state is None:
+        return False
+    try:
+        dtype_key = _get_dtype_key(gbuf_state, entry["dtype"])
+    except Exception:
+        return False
+    gbuf_dtype_state = gbuf_state[dtype_key]
+    end = entry["gbuf_world"]["end"]
+    for tensor_key in OPTIM_KEYS:
+        tensor = gbuf_dtype_state.get(tensor_key)
+        if tensor is None or end > tensor.numel():
+            return False
+    return True
+
+
 def _validate_entry_pair(param_name, old_entry, new_entry):
     for field in ("optimizer_index", "gbuf_idx", "bucket_idx", "dtype"):
         if field == "optimizer_index":
@@ -281,7 +301,7 @@ def _rewrite_target_rank(
     target_path,
     file_to_modules,
     input_optim_paths,
-    dp_world_size,
+    rank_to_file_index,
 ):
     target_state = copy.deepcopy(torch.load(target_path, map_location="cpu"))
     source_state_cache = {}
@@ -290,7 +310,7 @@ def _rewrite_target_rank(
         for tensor_key in OPTIM_KEYS:
             source_chunks = []
             for old_entry in module_plan["old_entries"]:
-                source_file_index = old_entry["rank"] // dp_world_size
+                source_file_index = rank_to_file_index[old_entry["rank"]]
                 source_path = input_optim_paths[source_file_index]
                 if source_file_index not in source_state_cache:
                     source_state_cache[source_file_index] = torch.load(
@@ -309,7 +329,7 @@ def _rewrite_target_rank(
                 target_start = new_entry["gbuf_world"]["start"]
                 target_end = new_entry["gbuf_world"]["end"]
                 chunk_size = target_end - target_start
-                if (new_entry["rank"] // dp_world_size) == target_file_index:
+                if rank_to_file_index[new_entry["rank"]] == target_file_index:
                     target_tensor = _get_world_tensor(target_state, new_entry, tensor_key)
                     target_tensor[target_start:target_end].copy_(
                         module_blob[cursor : cursor + chunk_size]
@@ -324,6 +344,36 @@ def _rewrite_target_rank(
 
     torch.save(target_state, target_path)
     return target_path
+
+
+def _infer_rank_to_file_index(rank_entries_map, optim_paths):
+    state_cache = {}
+
+    def load_state(file_index):
+        if file_index not in state_cache:
+            state_cache[file_index] = torch.load(optim_paths[file_index], map_location="cpu")
+        return state_cache[file_index]
+
+    rank_to_file_index = {}
+    for rank, entries in sorted(rank_entries_map.items()):
+        candidates = set(range(len(optim_paths)))
+        for entry in entries:
+            entry_candidates = {
+                file_index
+                for file_index in candidates
+                if _entry_fits_state_dict(load_state(file_index), entry)
+            }
+            candidates &= entry_candidates
+            if len(candidates) == 1:
+                break
+        if not candidates:
+            raise ValueError(f"Unable to infer shard file for runtime rank {rank}")
+        if len(candidates) > 1:
+            raise ValueError(
+                f"Runtime rank {rank} matches multiple shard files: {sorted(candidates)}"
+            )
+        rank_to_file_index[rank] = next(iter(candidates))
+    return rank_to_file_index
 
 
 def main():
@@ -357,29 +407,11 @@ def main():
         raise FileNotFoundError(f"No distrib_optim.pt files found under {args.input_root}")
 
     rank_count = max(max(old_rank_entries), max(new_rank_entries)) + 1
-    if args.dp_world_size is not None:
-        dp_world_size = args.dp_world_size
-    else:
-        if rank_count % len(input_optim_paths) != 0:
-            raise ValueError(
-                f"Cannot infer dp-world-size: dump ranks span 0..{rank_count - 1} "
-                f"but found {len(input_optim_paths)} distrib_optim.pt files."
-            )
-        dp_world_size = rank_count // len(input_optim_paths)
-
-    if dp_world_size <= 0:
-        raise ValueError(f"Invalid dp-world-size: {dp_world_size}")
-    if rank_count % dp_world_size != 0:
-        raise ValueError(
-            f"Dump rank count {rank_count} is not divisible by dp-world-size {dp_world_size}"
-        )
-
-    file_count_from_dump = rank_count // dp_world_size
-    if len(input_optim_paths) != file_count_from_dump:
-        raise ValueError(
-            f"Found {len(input_optim_paths)} distrib_optim.pt files, but dump ranks 0..{rank_count - 1} "
-            f"with dp-world-size {dp_world_size} imply {file_count_from_dump} shard files."
-        )
+    rank_entries_map = {
+        rank: old_rank_entries.get(rank, []) + new_rank_entries.get(rank, [])
+        for rank in range(rank_count)
+    }
+    rank_to_file_index = _infer_rank_to_file_index(rank_entries_map, input_optim_paths)
 
     changed_pairs = []
     for module_prefix in changed_modules:
@@ -427,7 +459,7 @@ def main():
     }
     file_to_modules = defaultdict(list)
     for module_plan in module_plans:
-        for file_index in {entry["rank"] // dp_world_size for entry in module_plan["new_entries"]}:
+        for file_index in {rank_to_file_index[entry["rank"]] for entry in module_plan["new_entries"]}:
             if file_index in selected_target_files:
                 file_to_modules[file_index].append(module_plan)
 
@@ -442,7 +474,7 @@ def main():
             output_optim_paths[target_file_index],
             file_to_modules,
             input_optim_paths,
-            dp_world_size,
+            rank_to_file_index,
         )
         for target_file_index in sorted(file_to_modules)
     ]
