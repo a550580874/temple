@@ -10,6 +10,12 @@ import torch
 
 
 OPTIM_KEYS = ("param", "exp_avg", "exp_avg_sq")
+PARAM_SUFFIXES = (
+    "layer_norm_weight",
+    "layer_norm_bias",
+    "weight",
+    "bias",
+)
 
 
 def parse_args():
@@ -78,6 +84,14 @@ def _entry_signature(entry):
     )
 
 
+def _module_prefix(param_name):
+    for suffix in PARAM_SUFFIXES:
+        token = f".{suffix}"
+        if param_name.endswith(token):
+            return param_name[: -len(token)]
+    raise ValueError(f"Unsupported parameter name for module rewrite: {param_name}")
+
+
 def _discover_optimizer_files(root_dir):
     paths = []
     for current_root, _dirs, files in os.walk(root_dir):
@@ -123,13 +137,6 @@ def _get_world_tensor(state_dict, entry, tensor_key):
 
 
 def _validate_entry_pair(param_name, old_entry, new_entry):
-    old_size = old_entry["gbuf_world"]["size"]
-    new_size = new_entry["gbuf_world"]["size"]
-    if old_size != new_size:
-        raise ValueError(
-            f"Parameter {param_name} changed size from {old_size} to {new_size}, "
-            "which this converter does not support."
-        )
     for field in ("optimizer_index", "gbuf_idx", "bucket_idx", "dtype"):
         if field == "optimizer_index":
             # The checkpoint file contains one distrib_optim.pt per rank/shard; optimizer_index
@@ -154,6 +161,48 @@ def _summarize_plan(changed_pairs):
         "cross_rank_moves": moved_across_rank,
         "target_ranks_touched": len(per_target_rank),
     }
+
+
+def _sort_entries_for_layout(entries):
+    return sorted(
+        entries,
+        key=lambda entry: (
+            entry["rank"],
+            entry["gbuf_idx"],
+            entry["bucket_idx"],
+            entry["gbuf_world"]["start"],
+            entry["gbuf_world"]["end"],
+            entry["param_name"],
+        ),
+    )
+
+
+def _build_module_rewrite_plan(changed_pairs, old_param_map, new_param_map):
+    changed_modules = {_module_prefix(param_name) for param_name, _, _ in changed_pairs}
+    module_plans = []
+    for module_prefix in sorted(changed_modules):
+        old_entries = _sort_entries_for_layout(
+            [entry for name, entry in old_param_map.items() if _module_prefix(name) == module_prefix]
+        )
+        new_entries = _sort_entries_for_layout(
+            [entry for name, entry in new_param_map.items() if _module_prefix(name) == module_prefix]
+        )
+        old_total = sum(entry["gbuf_world"]["size"] for entry in old_entries)
+        new_total = sum(entry["gbuf_world"]["size"] for entry in new_entries)
+        if old_total != new_total:
+            raise ValueError(
+                f"Module {module_prefix} changed total size from {old_total} to {new_total}, "
+                "which this converter does not support."
+            )
+        module_plans.append(
+            {
+                "module_prefix": module_prefix,
+                "old_entries": old_entries,
+                "new_entries": new_entries,
+                "total_size": old_total,
+            }
+        )
+    return module_plans
 
 
 def main():
@@ -187,6 +236,8 @@ def main():
         print("No distributed optimizer slice changes detected between old/new dumps.")
         return
 
+    module_plans = _build_module_rewrite_plan(changed_pairs, old_param_map, new_param_map)
+
     input_optim_paths = _discover_optimizer_files(args.input_root)
     if not input_optim_paths:
         raise FileNotFoundError(f"No distrib_optim.pt files found under {args.input_root}")
@@ -199,6 +250,7 @@ def main():
         )
 
     summary = _summarize_plan(changed_pairs)
+    summary["changed_module_count"] = len(module_plans)
     print(json.dumps(summary, indent=2, ensure_ascii=False))
     for param_name, old_entry, new_entry in changed_pairs:
         if old_entry["rank"] != new_entry["rank"]:
@@ -225,40 +277,49 @@ def main():
         raise ValueError("Output checkpoint tree does not contain the expected distrib_optim.pt files.")
 
     source_state_cache = {}
-    target_ops = defaultdict(list)
-    for param_name, old_entry, new_entry in changed_pairs:
-        target_ops[new_entry["rank"]].append((param_name, old_entry, new_entry))
+    target_state_cache = {}
 
-    for target_rank, operations in sorted(target_ops.items()):
-        target_path = output_optim_paths[target_rank]
-        target_state = torch.load(target_path, map_location="cpu")
-        target_state = copy.deepcopy(target_state)
-
-        for param_name, old_entry, new_entry in operations:
-            source_rank = old_entry["rank"]
-            source_path = input_optim_paths[source_rank]
-            if source_rank not in source_state_cache:
-                source_state_cache[source_rank] = torch.load(source_path, map_location="cpu")
-            source_state = source_state_cache[source_rank]
-
-            for tensor_key in OPTIM_KEYS:
+    for module_plan in module_plans:
+        for tensor_key in OPTIM_KEYS:
+            source_chunks = []
+            for old_entry in module_plan["old_entries"]:
+                source_rank = old_entry["rank"]
+                source_path = input_optim_paths[source_rank]
+                if source_rank not in source_state_cache:
+                    source_state_cache[source_rank] = torch.load(source_path, map_location="cpu")
+                source_state = source_state_cache[source_rank]
                 source_tensor = _get_world_tensor(source_state, old_entry, tensor_key)
+                start = old_entry["gbuf_world"]["start"]
+                end = old_entry["gbuf_world"]["end"]
+                source_chunks.append(source_tensor[start:end].clone())
+
+            module_blob = torch.cat(source_chunks, dim=0)
+            cursor = 0
+
+            for new_entry in module_plan["new_entries"]:
+                target_rank = new_entry["rank"]
+                target_path = output_optim_paths[target_rank]
+                if target_rank not in target_state_cache:
+                    target_state_cache[target_rank] = copy.deepcopy(
+                        torch.load(target_path, map_location="cpu")
+                    )
+                target_state = target_state_cache[target_rank]
                 target_tensor = _get_world_tensor(target_state, new_entry, tensor_key)
 
-                source_start = old_entry["gbuf_world"]["start"]
-                source_end = old_entry["gbuf_world"]["end"]
                 target_start = new_entry["gbuf_world"]["start"]
                 target_end = new_entry["gbuf_world"]["end"]
+                chunk_size = target_end - target_start
+                target_tensor[target_start:target_end].copy_(module_blob[cursor : cursor + chunk_size])
+                cursor += chunk_size
 
-                source_view = source_tensor[source_start:source_end]
-                target_view = target_tensor[target_start:target_end]
-                if source_view.numel() != target_view.numel():
-                    raise ValueError(
-                        f"Slice size mismatch for {param_name} key={tensor_key}: "
-                        f"{source_view.numel()} vs {target_view.numel()}"
-                    )
-                target_view.copy_(source_view)
+            if cursor != module_blob.numel():
+                raise ValueError(
+                    f"Module {module_plan['module_prefix']} key={tensor_key} consumed {cursor} "
+                    f"elements but source blob has {module_blob.numel()} elements."
+                )
 
+    for target_rank, target_state in sorted(target_state_cache.items()):
+        target_path = output_optim_paths[target_rank]
         torch.save(target_state, target_path)
         print(f"[write] rewrote {target_path}")
 
