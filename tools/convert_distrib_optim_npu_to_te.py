@@ -407,11 +407,12 @@ def main():
         raise FileNotFoundError(f"No distrib_optim.pt files found under {args.input_root}")
 
     rank_count = max(max(old_rank_entries), max(new_rank_entries)) + 1
-    rank_entries_map = {
-        rank: old_rank_entries.get(rank, []) + new_rank_entries.get(rank, [])
-        for rank in range(rank_count)
-    }
-    rank_to_file_index = _infer_rank_to_file_index(rank_entries_map, input_optim_paths)
+    rank_to_file_index = _infer_rank_to_file_index(old_rank_entries, input_optim_paths)
+    missing_ranks = [rank for rank in range(rank_count) if rank not in rank_to_file_index]
+    if missing_ranks:
+        raise ValueError(
+            f"Old dump did not infer shard files for ranks: {missing_ranks[:10]}"
+        )
 
     changed_pairs = []
     for module_prefix in changed_modules:
