@@ -105,7 +105,7 @@ def _module_prefix(param_name):
         token = f".{suffix}"
         if param_name.endswith(token):
             return param_name[: -len(token)]
-    raise ValueError(f"Unsupported parameter name for module rewrite: {param_name}")
+    return None
 
 
 def _discover_optimizer_files(root_dir):
@@ -205,14 +205,27 @@ def _sort_entries_for_layout(entries):
 
 
 def _build_module_rewrite_plan(changed_pairs, old_param_map, new_param_map):
-    changed_modules = {_module_prefix(param_name) for param_name, _, _ in changed_pairs}
+    changed_modules = {
+        prefix
+        for param_name, _, _ in changed_pairs
+        for prefix in [_module_prefix(param_name)]
+        if prefix is not None
+    }
     module_plans = []
     for module_prefix in sorted(changed_modules):
         old_entries = _sort_entries_for_layout(
-            [entry for name, entry in old_param_map.items() if _module_prefix(name) == module_prefix]
+            [
+                entry
+                for name, entry in old_param_map.items()
+                if _module_prefix(name) == module_prefix
+            ]
         )
         new_entries = _sort_entries_for_layout(
-            [entry for name, entry in new_param_map.items() if _module_prefix(name) == module_prefix]
+            [
+                entry
+                for name, entry in new_param_map.items()
+                if _module_prefix(name) == module_prefix
+            ]
         )
         old_total = sum(entry["gbuf_world"]["size"] for entry in old_entries)
         new_total = sum(entry["gbuf_world"]["size"] for entry in new_entries)
