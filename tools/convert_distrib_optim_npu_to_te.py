@@ -61,6 +61,15 @@ def parse_args():
             "Can be provided multiple times, e.g. --path-contains mp_rank_00_001."
         ),
     )
+    parser.add_argument(
+        "--dp-world-size",
+        type=int,
+        default=None,
+        help=(
+            "Number of runtime dump ranks that collapse into one distrib_optim.pt shard. "
+            "If omitted, it is inferred as total_dump_ranks / num_distrib_optim_files."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -268,23 +277,26 @@ def _build_module_rewrite_plan_from_groups(changed_modules, old_grouped, new_gro
 
 
 def _rewrite_target_rank(
-    target_rank,
+    target_file_index,
     target_path,
-    rank_to_modules,
+    file_to_modules,
     input_optim_paths,
+    dp_world_size,
 ):
     target_state = copy.deepcopy(torch.load(target_path, map_location="cpu"))
     source_state_cache = {}
 
-    for module_plan in rank_to_modules[target_rank]:
+    for module_plan in file_to_modules[target_file_index]:
         for tensor_key in OPTIM_KEYS:
             source_chunks = []
             for old_entry in module_plan["old_entries"]:
-                source_rank = old_entry["rank"]
-                source_path = input_optim_paths[source_rank]
-                if source_rank not in source_state_cache:
-                    source_state_cache[source_rank] = torch.load(source_path, map_location="cpu")
-                source_state = source_state_cache[source_rank]
+                source_file_index = old_entry["rank"] // dp_world_size
+                source_path = input_optim_paths[source_file_index]
+                if source_file_index not in source_state_cache:
+                    source_state_cache[source_file_index] = torch.load(
+                        source_path, map_location="cpu"
+                    )
+                source_state = source_state_cache[source_file_index]
                 source_tensor = _get_world_tensor(source_state, old_entry, tensor_key)
                 start = old_entry["gbuf_world"]["start"]
                 end = old_entry["gbuf_world"]["end"]
@@ -297,7 +309,7 @@ def _rewrite_target_rank(
                 target_start = new_entry["gbuf_world"]["start"]
                 target_end = new_entry["gbuf_world"]["end"]
                 chunk_size = target_end - target_start
-                if new_entry["rank"] == target_rank:
+                if (new_entry["rank"] // dp_world_size) == target_file_index:
                     target_tensor = _get_world_tensor(target_state, new_entry, tensor_key)
                     target_tensor[target_start:target_end].copy_(
                         module_blob[cursor : cursor + chunk_size]
@@ -345,10 +357,28 @@ def main():
         raise FileNotFoundError(f"No distrib_optim.pt files found under {args.input_root}")
 
     rank_count = max(max(old_rank_entries), max(new_rank_entries)) + 1
-    if len(input_optim_paths) != rank_count:
+    if args.dp_world_size is not None:
+        dp_world_size = args.dp_world_size
+    else:
+        if rank_count % len(input_optim_paths) != 0:
+            raise ValueError(
+                f"Cannot infer dp-world-size: dump ranks span 0..{rank_count - 1} "
+                f"but found {len(input_optim_paths)} distrib_optim.pt files."
+            )
+        dp_world_size = rank_count // len(input_optim_paths)
+
+    if dp_world_size <= 0:
+        raise ValueError(f"Invalid dp-world-size: {dp_world_size}")
+    if rank_count % dp_world_size != 0:
         raise ValueError(
-            f"Found {len(input_optim_paths)} distrib_optim.pt files but dump ranks span 0..{rank_count - 1}. "
-            "This script currently assumes one distrib_optim.pt per dump rank."
+            f"Dump rank count {rank_count} is not divisible by dp-world-size {dp_world_size}"
+        )
+
+    file_count_from_dump = rank_count // dp_world_size
+    if len(input_optim_paths) != file_count_from_dump:
+        raise ValueError(
+            f"Found {len(input_optim_paths)} distrib_optim.pt files, but dump ranks 0..{rank_count - 1} "
+            f"with dp-world-size {dp_world_size} imply {file_count_from_dump} shard files."
         )
 
     changed_pairs = []
@@ -392,23 +422,29 @@ def main():
             f"No distrib_optim.pt matched --path-contains filters: {args.path_contains}"
         )
 
-    selected_target_ranks = {
-        rank for rank, path in enumerate(output_optim_paths) if path in selected_output_paths
+    selected_target_files = {
+        file_index for file_index, path in enumerate(output_optim_paths) if path in selected_output_paths
     }
-    rank_to_modules = defaultdict(list)
+    file_to_modules = defaultdict(list)
     for module_plan in module_plans:
-        for rank in {entry["rank"] for entry in module_plan["new_entries"]}:
-            if rank in selected_target_ranks:
-                rank_to_modules[rank].append(module_plan)
+        for file_index in {entry["rank"] // dp_world_size for entry in module_plan["new_entries"]}:
+            if file_index in selected_target_files:
+                file_to_modules[file_index].append(module_plan)
 
-    if not rank_to_modules:
+    if not file_to_modules:
         print("No target ranks matched the selected filters.")
         return
 
     workers = max(1, args.workers)
     tasks = [
-        (target_rank, output_optim_paths[target_rank], rank_to_modules, input_optim_paths)
-        for target_rank in sorted(rank_to_modules)
+        (
+            target_file_index,
+            output_optim_paths[target_file_index],
+            file_to_modules,
+            input_optim_paths,
+            dp_world_size,
+        )
+        for target_file_index in sorted(file_to_modules)
     ]
 
     if workers == 1:
