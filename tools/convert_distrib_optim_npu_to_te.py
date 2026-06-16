@@ -167,12 +167,24 @@ def _get_dtype_key(dtype_map, dtype_string):
 
 
 def _get_world_tensor(state_dict, entry, tensor_key):
+    if isinstance(state_dict, list):
+        state_dict = state_dict[entry["optimizer_index"]]
     gbuf_state = state_dict[entry["gbuf_idx"]]
     dtype_key = _get_dtype_key(gbuf_state, entry["dtype"])
     return gbuf_state[dtype_key][tensor_key]
 
 
+def _get_local_range(entry):
+    return entry["gbuf_local"]["start"], entry["gbuf_local"]["end"]
+
+
 def _entry_fits_state_dict(state_dict, entry):
+    if isinstance(state_dict, list):
+        if entry["optimizer_index"] >= len(state_dict):
+            return False
+        state_dict = state_dict[entry["optimizer_index"]]
+    if state_dict is None:
+        return False
     try:
         gbuf_state = state_dict[entry["gbuf_idx"]]
     except Exception:
@@ -184,7 +196,7 @@ def _entry_fits_state_dict(state_dict, entry):
     except Exception:
         return False
     gbuf_dtype_state = gbuf_state[dtype_key]
-    end = entry["gbuf_world"]["end"]
+    _start, end = _get_local_range(entry)
     for tensor_key in OPTIM_KEYS:
         tensor = gbuf_dtype_state.get(tensor_key)
         if tensor is None or end > tensor.numel():
@@ -231,6 +243,47 @@ def _sort_entries_for_layout(entries):
             entry["param_name"],
         ),
     )
+
+
+def _build_module_rewrite_plan(changed_pairs, old_param_map, new_param_map):
+    changed_modules = {
+        prefix
+        for param_name, _, _ in changed_pairs
+        for prefix in [_module_prefix(param_name)]
+        if prefix is not None
+    }
+    module_plans = []
+    for module_prefix in sorted(changed_modules):
+        old_entries = _sort_entries_for_layout(
+            [
+                entry
+                for name, entry in old_param_map.items()
+                if _module_prefix(name) == module_prefix
+            ]
+        )
+        new_entries = _sort_entries_for_layout(
+            [
+                entry
+                for name, entry in new_param_map.items()
+                if _module_prefix(name) == module_prefix
+            ]
+        )
+        old_total = sum(entry["gbuf_world"]["size"] for entry in old_entries)
+        new_total = sum(entry["gbuf_world"]["size"] for entry in new_entries)
+        if old_total != new_total:
+            raise ValueError(
+                f"Module {module_prefix} changed total size from {old_total} to {new_total}, "
+                "which this converter does not support."
+            )
+        module_plans.append(
+            {
+                "module_prefix": module_prefix,
+                "old_entries": old_entries,
+                "new_entries": new_entries,
+                "total_size": old_total,
+            }
+        )
+    return module_plans
 
 
 def _group_entries_by_module(entries):
@@ -318,8 +371,7 @@ def _rewrite_target_rank(
                     )
                 source_state = source_state_cache[source_file_index]
                 source_tensor = _get_world_tensor(source_state, old_entry, tensor_key)
-                start = old_entry["gbuf_world"]["start"]
-                end = old_entry["gbuf_world"]["end"]
+                start, end = _get_local_range(old_entry)
                 source_chunks.append(source_tensor[start:end].clone())
 
             module_blob = torch.cat(source_chunks, dim=0)
@@ -331,7 +383,13 @@ def _rewrite_target_rank(
                 chunk_size = target_end - target_start
                 if rank_to_file_index[new_entry["rank"]] == target_file_index:
                     target_tensor = _get_world_tensor(target_state, new_entry, tensor_key)
-                    target_tensor[target_start:target_end].copy_(
+                    local_start, local_end = _get_local_range(new_entry)
+                    if (local_end - local_start) != chunk_size:
+                        raise ValueError(
+                            f"Local/world size mismatch for {new_entry['param_name']}: "
+                            f"local={local_end - local_start} world={chunk_size}."
+                        )
+                    target_tensor[local_start:local_end].copy_(
                         module_blob[cursor : cursor + chunk_size]
                     )
                 cursor += chunk_size
